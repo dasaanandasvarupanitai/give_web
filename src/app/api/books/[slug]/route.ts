@@ -20,7 +20,6 @@ export async function GET(
   const { slug } = resolvedParams;
   
   try {
-
     console.log("API Route - Received slug:", slug);
     console.log("API Route - Available books:", Object.keys(BOOKS_MAP));
 
@@ -39,34 +38,30 @@ export async function GET(
     const storageRef = ref(storage, storagePath);
     const downloadURL = await getDownloadURL(storageRef);
 
-    // Fetch the file from Firebase Storage
-    const fileResponse = await fetch(downloadURL);
-
-    if (!fileResponse.ok) {
-      return NextResponse.json(
-        { error: "Failed to fetch book" },
-        { status: fileResponse.status }
-      );
-    }
-
-    // Get the file content
-    const fileBuffer = await fileResponse.arrayBuffer();
-
     // Check if download is requested via query parameter
     const url = new URL(request.url);
     const forceDownload = url.searchParams.get("download") === "true";
     
-    // Set Content-Disposition header based on download parameter
-    const contentDisposition = forceDownload 
-      ? `attachment; filename="${slug}.pdf"` 
-      : `inline; filename="${slug}.pdf"`;
+    // Build the redirect URL
+    // For downloads, append alt=media to ensure proper download behavior
+    // The browser's download attribute will also help force download
+    let redirectURL = downloadURL;
+    if (forceDownload) {
+      // Append alt=media parameter if not already present
+      const urlObj = new URL(downloadURL);
+      urlObj.searchParams.set("alt", "media");
+      redirectURL = urlObj.toString();
+    }
 
-    // Return the file with proper headers
-    return new NextResponse(fileBuffer, {
+    // Redirect to Firebase Storage URL instead of proxying
+    // This eliminates Fast Origin Transfer usage while maintaining clean URLs
+    // 307 Temporary Redirect preserves the request method (GET)
+    return NextResponse.redirect(redirectURL, {
+      status: 307,
       headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": contentDisposition,
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        // Cache the redirect response for 1 hour
+        // The Firebase Storage URL itself has its own caching
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error: any) {
