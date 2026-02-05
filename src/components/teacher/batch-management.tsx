@@ -137,11 +137,11 @@ export function BatchManagement() {
 
         // Validate custom code if provided
         if (batchCode) {
-          // Validate format: alphanumeric, 3-10 characters
-          if (!/^[A-Z0-9]{3,10}$/.test(batchCode)) {
+          // Validate format: 3-20 characters, no spaces
+          if (!/^[^\s]{3,20}$/.test(batchCode)) {
             toast({
               title: "Invalid Class Code",
-              description: "Class code must be 3-10 characters and contain only letters and numbers.",
+              description: "Class code must be 3-20 characters and cannot contain spaces.",
               variant: "destructive",
             });
             setIsSubmitting(false);
@@ -363,13 +363,12 @@ export function BatchManagement() {
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Input
                           id="class-code"
-                          placeholder="e.g., BATCH1, MORNING2024"
+                          placeholder="e.g., BATCH-1, CLASS_2024!"
                           value={formData.classCode}
                           onChange={(e) =>
                             setFormData({ ...formData, classCode: e.target.value.toUpperCase() })
                           }
-                          maxLength={10}
-                          pattern="[A-Z0-9]{3,10}"
+                          maxLength={20}
                           className="flex-1 text-sm sm:text-base"
                         />
                         <Button
@@ -382,7 +381,7 @@ export function BatchManagement() {
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        3-10 characters, letters and numbers only. Must be unique.
+                        3-20 characters. Must be unique.
                       </p>
                     </div>
                   )}
