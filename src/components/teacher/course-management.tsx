@@ -1,25 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { Course } from "@/lib/models/course";
 import {
@@ -29,9 +10,10 @@ import {
     updateCourse
 } from "@/lib/services/firestore";
 import { deleteFileByUrl, uploadFile } from "@/lib/services/storage";
-import { BookOpen, Edit, Loader2, Plus, Trash2, X } from "lucide-react";
-import Image from "next/image";
+import { BookOpen, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { CourseCard } from "./courses/course-card";
+import { CourseFormDialog } from "./courses/course-form-dialog";
 
 // Normalize any localhost absolute URLs coming from the editor
 function normalizeInternalLinks(html: string): string {
@@ -61,7 +43,6 @@ export function CourseManagement() {
     });
 
     useEffect(() => {
-        // Subscribe to real-time updates
         const unsubscribe = subscribeCourses((coursesList) => {
             setCourses(coursesList);
             setLoading(false);
@@ -73,7 +54,6 @@ export function CourseManagement() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 toast({
                     title: "Invalid File",
@@ -83,7 +63,6 @@ export function CourseManagement() {
                 return;
             }
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 toast({
                     title: "File Too Large",
@@ -95,7 +74,6 @@ export function CourseManagement() {
 
             setSelectedFile(file);
 
-            // Create preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImagePreview(reader.result as string);
@@ -133,7 +111,6 @@ export function CourseManagement() {
             return;
         }
 
-        // For new courses, require an image
         if (!isEditing && !selectedFile) {
             toast({
                 title: "Validation Error",
@@ -150,7 +127,6 @@ export function CourseManagement() {
         try {
             let imageUrl = existingImageUrl || "";
 
-            // Upload new image if one is selected
             if (selectedFile) {
                 const timestamp = Date.now();
                 const sanitizedFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -174,12 +150,10 @@ export function CourseManagement() {
 
             setIsUploading(false);
 
-            // Delete old image if updating and new image was uploaded
             if (isEditing && editingId && selectedFile && existingImageUrl) {
                 try {
                     await deleteFileByUrl(existingImageUrl);
                 } catch (deleteError) {
-                    // Log but don't fail - the new image is already uploaded
                     console.warn("Failed to delete old image:", deleteError);
                 }
             }
@@ -241,18 +215,13 @@ export function CourseManagement() {
         }
 
         try {
-            // Find the course to get its image URL
             const courseToDelete = courses.find(c => c.id === id);
-
-            // Delete the course
             await deleteCourse(id);
 
-            // Delete the image from storage if it exists
             if (courseToDelete?.imageUrl) {
                 try {
                     await deleteFileByUrl(courseToDelete.imageUrl);
                 } catch (deleteError) {
-                    // Log but don't fail - the course is already deleted
                     console.warn("Failed to delete course image:", deleteError);
                 }
             }
@@ -312,120 +281,24 @@ export function CourseManagement() {
                         Manage courses displayed on the homepage
                     </p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => resetForm()} className="border border-orange-500">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Course
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <form onSubmit={handleSubmit}>
-                            <DialogHeader>
-                                <DialogTitle>{isEditing ? "Edit Course" : "Add Course"}</DialogTitle>
-                                <DialogDescription>
-                                    {isEditing
-                                        ? "Update the course details below."
-                                        : "Add a new course to display on the homepage."}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Title *</Label>
-                                    <Input
-                                        id="title"
-                                        placeholder="Enter course title..."
-                                        value={formData.title}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, title: e.target.value })
-                                        }
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Description *</Label>
-                                    <RichTextEditor
-                                        value={formData.description}
-                                        onChange={(val) => setFormData({ ...formData, description: val })}
-                                        placeholder="Add formatted course details, modules, links, and buttons..."
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="image">Course Image *</Label>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            ref={fileInputRef}
-                                            id="image"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            className="cursor-pointer border-primary focus-visible:ring-primary"
-                                            disabled={isSubmitting}
-                                        />
-                                        {(selectedFile || imagePreview) && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleRemoveFile}
-                                                disabled={isSubmitting}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                    {isUploading && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-muted-foreground">Uploading...</span>
-                                                <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
-                                            </div>
-                                            <div className="w-full bg-secondary rounded-full h-2">
-                                                <div
-                                                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                                                    style={{ width: `${uploadProgress}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                    {(imagePreview || (isEditing && existingImageUrl)) && (
-                                        <div className="relative h-48 w-full rounded-md overflow-hidden border">
-                                            <Image
-                                                src={imagePreview || existingImageUrl || ""}
-                                                alt="Course preview"
-                                                fill
-                                                className="object-cover"
-                                                onError={() => {
-                                                    // Image failed to load
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                        Upload an image for the course (max 5MB, JPG/PNG)
-                                    </p>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleDialogOpenChange(false)}
-                                    disabled={isSubmitting}
-                                    className="border border-orange-500"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting} className="border border-orange-500">
-                                    {isSubmitting && (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    {isEditing ? "Update" : "Create"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                <CourseFormDialog
+                    isOpen={isDialogOpen}
+                    onOpenChange={handleDialogOpenChange}
+                    isEditing={isEditing}
+                    isSubmitting={isSubmitting}
+                    isUploading={isUploading}
+                    uploadProgress={uploadProgress}
+                    formData={formData}
+                    setFormData={setFormData}
+                    selectedFile={selectedFile}
+                    imagePreview={imagePreview}
+                    existingImageUrl={existingImageUrl}
+                    fileInputRef={fileInputRef}
+                    onSubmit={handleSubmit}
+                    onFileChange={handleFileChange}
+                    onRemoveFile={handleRemoveFile}
+                    onReset={resetForm}
+                />
             </div>
 
             {courses.length === 0 ? (
@@ -438,46 +311,16 @@ export function CourseManagement() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {courses.map((course) => (
-                        <Card key={course.id}>
-                            <div className="relative h-48 w-full">
-                                <Image
-                                    src={course.imageUrl}
-                                    alt={course.title}
-                                    fill
-                                    className="object-cover"
-                                />
-                            </div>
-                            <CardHeader>
-                                <CardTitle className="text-base">{course.title}</CardTitle>
-                                <CardDescription className="line-clamp-2">{getPlainText(course.description)}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleEdit(course)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Edit className="h-4 w-4 mr-1" />
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDelete(course.id)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Delete
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <CourseCard
+                            key={course.id}
+                            course={course}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            getPlainText={getPlainText}
+                        />
                     ))}
                 </div>
             )}
         </div>
     );
 }
-

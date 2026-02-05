@@ -8,29 +8,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { addTeacher, removeTeacher } from "@/lib/user-roles";
 import { collection, getDocs } from "firebase/firestore";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-
-interface Teacher {
-  email: string;
-  isActive: boolean;
-  createdAt?: any;
-}
+import { AddTeacherDialog } from "./teachers/add-teacher-dialog";
+import { Teacher, TeacherRow } from "./teachers/teacher-row";
 
 export function TeacherManagement() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -144,50 +129,14 @@ export function TeacherManagement() {
               Add or remove teachers from the system
             </CardDescription>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Teacher
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[95vw] sm:w-full">
-              <form onSubmit={handleAddTeacher}>
-                <DialogHeader>
-                  <DialogTitle>Add New Teacher</DialogTitle>
-                  <DialogDescription>
-                    Enter the email address of the teacher to add. They will
-                    have access to the Teacher Dashboard once they log in.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="teacher@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isAdding}>
-                    {isAdding ? "Adding..." : "Add Teacher"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <AddTeacherDialog
+            isOpen={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            email={email}
+            onEmailChange={setEmail}
+            onSubmit={handleAddTeacher}
+            isAdding={isAdding}
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -202,32 +151,11 @@ export function TeacherManagement() {
         ) : (
           <div className="space-y-2">
             {teachers.map((teacher) => (
-              <div
+              <TeacherRow
                 key={teacher.email}
-                className="flex flex-row items-center justify-between gap-3 p-3 border rounded-lg"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{teacher.email}</p>
-                  {teacher.createdAt && (
-                    <p className="text-sm text-muted-foreground">
-                      Added:{" "}
-                      {teacher.createdAt?.toDate
-                        ? teacher.createdAt.toDate().toLocaleDateString()
-                        : teacher.createdAt instanceof Date
-                          ? teacher.createdAt.toLocaleDateString()
-                          : "N/A"}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveTeacher(teacher.email)}
-                  className="text-destructive hover:text-destructive flex-shrink-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+                teacher={teacher}
+                onRemove={handleRemoveTeacher}
+              />
             ))}
           </div>
         )}

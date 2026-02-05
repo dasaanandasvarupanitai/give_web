@@ -1,25 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { Testimonial } from "@/lib/models/testimonial";
 import {
@@ -29,10 +10,10 @@ import {
     updateTestimonial
 } from "@/lib/services/firestore";
 import { deleteFileByUrl, uploadFile } from "@/lib/services/storage";
-import { Edit, Loader2, Plus, Trash2, User, X } from "lucide-react";
-import Image from "next/image";
+import { Loader2, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { RichTextEditor } from "../ui/rich-text-editor";
+import { TestimonialCard } from "./testimonials/testimonial-card";
+import { TestimonialFormDialog } from "./testimonials/testimonial-form-dialog";
 
 export function TestimonialManagement() {
     const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -58,7 +39,6 @@ export function TestimonialManagement() {
     });
 
     useEffect(() => {
-        // Subscribe to real-time updates
         const unsubscribe = subscribeTestimonials((testimonialsList) => {
             setTestimonials(testimonialsList);
             setLoading(false);
@@ -70,7 +50,6 @@ export function TestimonialManagement() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 toast({
                     title: "Invalid File",
@@ -80,7 +59,6 @@ export function TestimonialManagement() {
                 return;
             }
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 toast({
                     title: "File Too Large",
@@ -92,7 +70,6 @@ export function TestimonialManagement() {
 
             setSelectedFile(file);
 
-            // Create preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImagePreview(reader.result as string);
@@ -127,7 +104,6 @@ export function TestimonialManagement() {
             return;
         }
 
-        // For new testimonials, require an image
         if (!isEditing && !selectedFile) {
             toast({
                 title: "Validation Error",
@@ -144,7 +120,6 @@ export function TestimonialManagement() {
         try {
             let imageUrl = existingImageUrl || "";
 
-            // Upload new image if one is selected
             if (selectedFile) {
                 const timestamp = Date.now();
                 const sanitizedFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -168,12 +143,10 @@ export function TestimonialManagement() {
 
             setIsUploading(false);
 
-            // Delete old image if updating and new image was uploaded
             if (isEditing && editingId && selectedFile && existingImageUrl) {
                 try {
                     await deleteFileByUrl(existingImageUrl);
                 } catch (deleteError) {
-                    // Log but don't fail - the new image is already uploaded
                     console.warn("Failed to delete old image:", deleteError);
                 }
             }
@@ -241,18 +214,13 @@ export function TestimonialManagement() {
         }
 
         try {
-            // Find the testimonial to get its image URL
             const testimonialToDelete = testimonials.find(t => t.id === id);
-
-            // Delete the testimonial
             await deleteTestimonial(id);
 
-            // Delete the image from storage if it exists
             if (testimonialToDelete?.imageUrl) {
                 try {
                     await deleteFileByUrl(testimonialToDelete.imageUrl);
                 } catch (deleteError) {
-                    // Log but don't fail - the testimonial is already deleted
                     console.warn("Failed to delete testimonial image:", deleteError);
                 }
             }
@@ -314,148 +282,24 @@ export function TestimonialManagement() {
                         Manage testimonials displayed on the homepage
                     </p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => resetForm()} className="border border-orange-500">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Testimonial
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <form onSubmit={handleSubmit}>
-                            <DialogHeader>
-                                <DialogTitle>{isEditing ? "Edit Testimonial" : "Add Testimonial"}</DialogTitle>
-                                <DialogDescription>
-                                    {isEditing
-                                        ? "Update the testimonial details below."
-                                        : "Add a new testimonial to display on the homepage."}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Name *</Label>
-                                    <Input
-                                        id="name"
-                                        placeholder="Enter person's name..."
-                                        value={formData.name}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, name: e.target.value })
-                                        }
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="designation">Designation</Label>
-                                    <Textarea
-                                        id="designation"
-                                        placeholder="Enter designation (optional)... Press Enter for new line"
-                                        value={formData.designation}
-                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                                            setFormData({ ...formData, designation: e.target.value })
-                                        }
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Address</Label>
-                                    <Input
-                                        id="address"
-                                        placeholder="Enter address (optional)..."
-                                        value={formData.address}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, address: e.target.value })
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Description *</Label>
-                                    <RichTextEditor
-                                        value={formData.description}
-                                        onChange={(val) => setFormData({ ...formData, description: val })}
-                                        placeholder="Add formatted testimonial description with paragraphs, lists, links, etc..."
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="image">Student Image *</Label>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            ref={fileInputRef}
-                                            id="image"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            className="cursor-pointer border-primary focus-visible:ring-primary"
-                                            disabled={isSubmitting}
-                                        />
-                                        {(selectedFile || imagePreview) && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleRemoveFile}
-                                                disabled={isSubmitting}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                    {isUploading && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-muted-foreground">Uploading...</span>
-                                                <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
-                                            </div>
-                                            <div className="w-full bg-secondary rounded-full h-2">
-                                                <div
-                                                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                                                    style={{ width: `${uploadProgress}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                    {(imagePreview || (isEditing && existingImageUrl)) && (
-                                        <div
-                                            className="relative h-48 w-full rounded-md overflow-hidden border"
-                                            onContextMenu={(e) => e.preventDefault()}
-                                            style={{ userSelect: 'none', pointerEvents: 'none' }}
-                                        >
-                                            <Image
-                                                src={imagePreview || existingImageUrl || ""}
-                                                alt="Testimonial preview"
-                                                fill
-                                                className="object-cover"
-                                                draggable={false}
-                                                onError={() => {
-                                                    // Image failed to load
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                        Upload an image for the testimonial (max 5MB, JPG/PNG). Images are protected from downloading.
-                                    </p>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleDialogOpenChange(false)}
-                                    disabled={isSubmitting}
-                                    className="border border-orange-500"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting} className="border border-orange-500">
-                                    {isSubmitting && (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    {isEditing ? "Update" : "Create"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                <TestimonialFormDialog
+                    isOpen={isDialogOpen}
+                    onOpenChange={handleDialogOpenChange}
+                    isEditing={isEditing}
+                    isSubmitting={isSubmitting}
+                    isUploading={isUploading}
+                    uploadProgress={uploadProgress}
+                    formData={formData}
+                    setFormData={setFormData}
+                    selectedFile={selectedFile}
+                    imagePreview={imagePreview}
+                    existingImageUrl={existingImageUrl}
+                    fileInputRef={fileInputRef}
+                    onSubmit={handleSubmit}
+                    onFileChange={handleFileChange}
+                    onRemoveFile={handleRemoveFile}
+                    onReset={resetForm}
+                />
             </div>
 
             {testimonials.length === 0 ? (
@@ -468,55 +312,16 @@ export function TestimonialManagement() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {testimonials.map((testimonial) => (
-                        <Card key={testimonial.id}>
-                            <div className="relative h-48 w-full">
-                                <Image
-                                    src={testimonial.imageUrl}
-                                    alt={testimonial.name}
-                                    fill
-                                    className="object-cover"
-                                    draggable={false}
-                                />
-                            </div>
-                            <CardHeader>
-                                <CardTitle className="text-base font-bold">{testimonial.name}</CardTitle>
-                                {testimonial.designation && (
-                                    <CardDescription className="font-normal whitespace-pre-line">{testimonial.designation}</CardDescription>
-                                )}
-                                {testimonial.address && (
-                                    <CardDescription className="font-normal">{testimonial.address}</CardDescription>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                                    {getPlainText(testimonial.description)}
-                                </p>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleEdit(testimonial)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Edit className="h-4 w-4 mr-1" />
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDelete(testimonial.id)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Delete
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <TestimonialCard
+                            key={testimonial.id}
+                            testimonial={testimonial}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            getPlainText={getPlainText}
+                        />
                     ))}
                 </div>
             )}
         </div>
     );
 }
-

@@ -1,18 +1,6 @@
 "use client";
 
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -30,8 +18,9 @@ import {
     getEnrollmentsByBatch,
     getUserById,
 } from "@/lib/services/firestore";
-import { ChevronDown, ChevronRight, Loader2, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { GroupCollapsible } from "./students/group-collapsible";
 
 interface StudentData {
     student: User;
@@ -103,7 +92,6 @@ export function AllStudentsView({
             }
 
             setGroups(groupsData);
-            // Expand first group by default
             if (groupsData.length > 0) {
                 setExpandedGroups(new Set([groupsData[0].group.id]));
             }
@@ -156,102 +144,15 @@ export function AllStudentsView({
                 ) : (
                     <div className="space-y-2">
                         {groups.map((groupData) => (
-                            <Card key={groupData.group.id}>
-                                <Collapsible
-                                    open={expandedGroups.has(groupData.group.id)}
-                                    onOpenChange={() => toggleGroup(groupData.group.id)}
-                                >
-                                    <CollapsibleTrigger asChild>
-                                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    {expandedGroups.has(groupData.group.id) ? (
-                                                        <ChevronDown className="h-4 w-4" />
-                                                    ) : (
-                                                        <ChevronRight className="h-4 w-4" />
-                                                    )}
-                                                    <CardTitle className="text-lg">
-                                                        {groupData.group.name}
-                                                    </CardTitle>
-                                                </div>
-                                                <CardDescription>
-                                                    {groupData.batches.length} batch
-                                                    {groupData.batches.length !== 1 ? "es" : ""}
-                                                </CardDescription>
-                                            </div>
-                                        </CardHeader>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <CardContent className="pt-0">
-                                            <div className="space-y-2 pl-6">
-                                                {groupData.batches.map((batchData) => (
-                                                    <Collapsible
-                                                        key={batchData.batch.id}
-                                                        open={expandedBatches.has(batchData.batch.id)}
-                                                        onOpenChange={() =>
-                                                            toggleBatch(batchData.batch.id)
-                                                        }
-                                                    >
-                                                        <CollapsibleTrigger asChild>
-                                                            <div className="cursor-pointer p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-2">
-                                                                        {expandedBatches.has(batchData.batch.id) ? (
-                                                                            <ChevronDown className="h-4 w-4" />
-                                                                        ) : (
-                                                                            <ChevronRight className="h-4 w-4" />
-                                                                        )}
-                                                                        <span className="font-medium">
-                                                                            {batchData.batch.name}
-                                                                        </span>
-                                                                    </div>
-                                                                    <span className="text-sm text-muted-foreground">
-                                                                        {batchData.students.length} student
-                                                                        {batchData.students.length !== 1 ? "s" : ""}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </CollapsibleTrigger>
-                                                        <CollapsibleContent>
-                                                            <div className="pl-6 pt-2 space-y-2">
-                                                                {batchData.students.map((studentData) => (
-                                                                    <Card key={studentData.enrollment.id}>
-                                                                        <CardContent className="py-3">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                                                                    <span className="text-primary font-medium">
-                                                                                        {studentData.student.name
-                                                                                            .charAt(0)
-                                                                                            .toUpperCase()}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div className="flex-1">
-                                                                                    <p className="font-medium">
-                                                                                        {studentData.student.name}
-                                                                                    </p>
-                                                                                    <p className="text-sm text-muted-foreground">
-                                                                                        {studentData.student.email}
-                                                                                    </p>
-                                                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                                                        Enrolled:{" "}
-                                                                                        {new Date(
-                                                                                            studentData.enrollment.enrolledAt
-                                                                                        ).toLocaleDateString()}
-                                                                                    </p>
-                                                                                </div>
-                                                                            </div>
-                                                                        </CardContent>
-                                                                    </Card>
-                                                                ))}
-                                                            </div>
-                                                        </CollapsibleContent>
-                                                    </Collapsible>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </CollapsibleContent>
-                                </Collapsible>
-                            </Card>
+                            <GroupCollapsible
+                                key={groupData.group.id}
+                                group={groupData.group}
+                                batches={groupData.batches}
+                                isExpanded={expandedGroups.has(groupData.group.id)}
+                                onToggle={() => toggleGroup(groupData.group.id)}
+                                expandedBatches={expandedBatches}
+                                onBatchToggle={toggleBatch}
+                            />
                         ))}
                     </div>
                 )}
@@ -259,4 +160,3 @@ export function AllStudentsView({
         </Dialog>
     );
 }
-

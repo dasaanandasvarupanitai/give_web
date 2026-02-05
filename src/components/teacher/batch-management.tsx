@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -26,30 +25,26 @@ import {
   getCourseGroups,
   subscribeBatchesByCourseGroup,
 } from "@/lib/services/firestore";
-import { Check, Copy, Edit, Loader2, Plus, Trash2, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Loader2, Plus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BatchFormDialog } from "./batch-form-dialog";
+import { BatchCard } from "./batches/batch-card";
 
 export function BatchManagement() {
   const { user } = useAuthUser();
-  const router = useRouter();
   const [courseGroups, setCourseGroups] = useState<CourseGroup[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedCourseGroupId, setSelectedCourseGroupId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
 
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (!user?.uid) return;
-
     loadCourseGroups();
   }, [user]);
 
@@ -100,11 +95,7 @@ export function BatchManagement() {
   };
 
   const handleDelete = async (id: string, courseGroupId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this batch? This action cannot be undone."
-      )
-    ) {
+    if (!confirm("Are you sure you want to delete this batch? This action cannot be undone.")) {
       return;
     }
 
@@ -125,17 +116,13 @@ export function BatchManagement() {
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    setCopiedCode(code);
     toast({
       title: "Copied!",
       description: "Class code copied to clipboard",
     });
-    setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const selectedCourseGroup = courseGroups.find(
-    (cg) => cg.id === selectedCourseGroupId
-  );
+  const selectedCourseGroup = courseGroups.find((cg) => cg.id === selectedCourseGroupId);
 
   if (loading) {
     return (
@@ -181,13 +168,9 @@ export function BatchManagement() {
               courseGroupId={selectedCourseGroupId}
               courseGroupName={selectedCourseGroup?.name}
               teacherId={user.uid}
-              onSuccess={() => {
-                // Determine if we need to reload anything or if subscription handles it
-                // Subscription handles list updates, so nothing manual needed
-              }}
+              onSuccess={() => { }}
             />
           )}
-
         </div>
       </CardHeader>
       <CardContent>
@@ -225,75 +208,13 @@ export function BatchManagement() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {batches.map((batch) => (
-                  <Card key={batch.id}>
-                    <CardHeader>
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-lg">{batch.name}</CardTitle>
-                          {batch.description && (
-                            <CardDescription className="mt-1">
-                              <ExpandableDescription text={batch.description} maxLines={2} />
-                            </CardDescription>
-                          )}
-                        </div>
-                        <div className="flex gap-1 self-start sm:self-auto">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(batch)}
-                            className="border border-orange-500"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(batch.id, batch.courseGroupId)}
-                            className="text-destructive hover:text-destructive border border-orange-500"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 bg-muted rounded">
-                          <span className="text-sm font-medium">Class Code:</span>
-                          <div className="flex items-center gap-2">
-                            <code className="text-sm font-mono break-all">{batch.classCode}</code>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 flex-shrink-0"
-                              onClick={() => handleCopyCode(batch.classCode)}
-                            >
-                              {copiedCode === batch.classCode ? (
-                                <Check className="h-3 w-3" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-                          <span>{batch.studentCount} students</span>
-                          {batch.startDate && (
-                            <span>
-                              Starts {new Date(batch.startDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          variant="outline"
-                          className="w-full border border-orange-500"
-                          onClick={() => router.push(`/teacher/batches/${batch.id}`)}
-                        >
-                          View Details
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <BatchCard
+                    key={batch.id}
+                    batch={batch}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onCopyCode={handleCopyCode}
+                  />
                 ))}
               </div>
             )}

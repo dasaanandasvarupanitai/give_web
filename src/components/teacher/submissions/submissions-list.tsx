@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { Enrollment } from "@/lib/models/enrollment";
 import type { Task } from "@/lib/models/task";
 import type { User } from "@/lib/models/user";
@@ -18,7 +17,9 @@ import {
     getTaskTypeIcon,
     getTaskTypeLabel,
 } from "@/lib/utils/task-helpers";
-import { Download, Eye, FileText, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { FileSubmissionCard } from "./file-submission-card";
+import { TextSubmissionCard } from "./text-submission-card";
 
 export interface StudentFile {
     submissionId: string;
@@ -150,10 +151,10 @@ export function SubmissionsList({
                                         <Badge
                                             variant="outline"
                                             className={`ml-2 ${displayStatus === "scheduled"
-                                                    ? "bg-gray-50 text-gray-700 border-gray-200"
-                                                    : displayStatus === "published"
-                                                        ? "bg-orange-50 text-orange-700 border-orange-200"
-                                                        : "bg-red-50 text-red-700 border-red-200"
+                                                ? "bg-gray-50 text-gray-700 border-gray-200"
+                                                : displayStatus === "published"
+                                                    ? "bg-orange-50 text-orange-700 border-orange-200"
+                                                    : "bg-red-50 text-red-700 border-red-200"
                                                 }`}
                                         >
                                             {displayStatus.charAt(0).toUpperCase() +
@@ -271,177 +272,36 @@ export function SubmissionsList({
                                                             {isDailyListening &&
                                                                 studentSub.textSubmissions.map(
                                                                     (textSub, index) => (
-                                                                        <div
+                                                                        <TextSubmissionCard
                                                                             key={`text-${index}`}
-                                                                            className="flex flex-col p-3 bg-muted rounded-lg border gap-2 w-full"
-                                                                        >
-                                                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                                                                <span className="text-sm font-medium break-words">
-                                                                                    Text Submission
-                                                                                </span>
-                                                                            </div>
-                                                                            {textSub.taskTitle && (
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <Badge
-                                                                                        variant="outline"
-                                                                                        className="text-xs"
-                                                                                    >
-                                                                                        {textSub.taskTitle}
-                                                                                    </Badge>
-                                                                                </div>
-                                                                            )}
-                                                                            <div className="text-sm text-muted-foreground line-clamp-3 break-words">
-                                                                                {textSub.text}
-                                                                            </div>
-                                                                            {textSub.submittedAt && (
-                                                                                <div className="text-xs text-muted-foreground">
-                                                                                    Submitted:{" "}
-                                                                                    {textSub.submittedAt.toLocaleString(
-                                                                                        undefined,
-                                                                                        {
-                                                                                            year: "numeric",
-                                                                                            month: "short",
-                                                                                            day: "numeric",
-                                                                                            hour: "2-digit",
-                                                                                            minute: "2-digit",
-                                                                                        }
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                            <div className="flex items-center gap-1 flex-shrink-0 self-end">
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-8 w-8"
-                                                                                    onClick={() =>
-                                                                                        onPreviewText(textSub.text)
-                                                                                    }
-                                                                                    title="View full text"
-                                                                                >
-                                                                                    <Eye className="h-4 w-4" />
-                                                                                </Button>
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="icon"
-                                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                                                                    onClick={() =>
-                                                                                        onDeleteText(
-                                                                                            textSub.submissionId,
-                                                                                            textSub.studentId
-                                                                                        )
-                                                                                    }
-                                                                                    title="Delete text submission"
-                                                                                >
-                                                                                    <Trash2 className="h-4 w-4" />
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
+                                                                            text={textSub.text}
+                                                                            submissionId={textSub.submissionId}
+                                                                            studentId={textSub.studentId}
+                                                                            taskTitle={textSub.taskTitle}
+                                                                            submittedAt={textSub.submittedAt}
+                                                                            onPreview={onPreviewText}
+                                                                            onDelete={onDeleteText}
+                                                                        />
                                                                     )
                                                                 )}
 
                                                             {/* Render file submissions */}
-                                                            {studentSub.files.map((file, index) => {
-                                                                const isSelected = selectedFiles.has(
-                                                                    file.fileUrl
-                                                                );
-
-                                                                return (
-                                                                    <div
-                                                                        key={`file-${index}`}
-                                                                        className={`flex flex-col p-3 bg-muted rounded-lg border gap-2 w-full ${isSelected ? "ring-2 ring-primary" : ""
-                                                                            }`}
-                                                                    >
-                                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                            <Checkbox
-                                                                                checked={isSelected}
-                                                                                onCheckedChange={(checked) =>
-                                                                                    onSelectFile(
-                                                                                        file.fileUrl,
-                                                                                        checked === true
-                                                                                    )
-                                                                                }
-                                                                                className="flex-shrink-0"
-                                                                            />
-                                                                            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                                                            <span
-                                                                                className="text-sm break-words"
-                                                                                title={file.fileName}
-                                                                            >
-                                                                                {file.fileName}
-                                                                            </span>
-                                                                        </div>
-                                                                        {file.taskTitle && (
-                                                                            <div className="flex items-center gap-1">
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-xs"
-                                                                                >
-                                                                                    {file.taskTitle}
-                                                                                </Badge>
-                                                                            </div>
-                                                                        )}
-                                                                        {file.submittedAt && (
-                                                                            <div className="text-xs text-muted-foreground">
-                                                                                Submitted:{" "}
-                                                                                {file.submittedAt.toLocaleString(
-                                                                                    undefined,
-                                                                                    {
-                                                                                        year: "numeric",
-                                                                                        month: "short",
-                                                                                        day: "numeric",
-                                                                                        hour: "2-digit",
-                                                                                        minute: "2-digit",
-                                                                                    }
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="flex items-center gap-1 flex-shrink-0 self-end">
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8"
-                                                                                onClick={() =>
-                                                                                    onPreview(file.fileUrl, file.fileName)
-                                                                                }
-                                                                                title="Preview file"
-                                                                            >
-                                                                                <Eye className="h-4 w-4" />
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8"
-                                                                                onClick={() =>
-                                                                                    handleDownload(
-                                                                                        file.fileUrl,
-                                                                                        file.fileName
-                                                                                    )
-                                                                                }
-                                                                                title="Download file"
-                                                                            >
-                                                                                <Download className="h-4 w-4" />
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                                                                onClick={() =>
-                                                                                    onDeleteFile(
-                                                                                        file.submissionId,
-                                                                                        file.fileUrl,
-                                                                                        file.fileName,
-                                                                                        file.studentId
-                                                                                    )
-                                                                                }
-                                                                                title="Delete file"
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                            {studentSub.files.map((file, index) => (
+                                                                <FileSubmissionCard
+                                                                    key={`file-${index}`}
+                                                                    fileName={file.fileName}
+                                                                    fileUrl={file.fileUrl}
+                                                                    submissionId={file.submissionId}
+                                                                    studentId={file.studentId}
+                                                                    taskTitle={file.taskTitle}
+                                                                    submittedAt={file.submittedAt}
+                                                                    isSelected={selectedFiles.has(file.fileUrl)}
+                                                                    onSelect={onSelectFile}
+                                                                    onPreview={onPreview}
+                                                                    onDownload={handleDownload}
+                                                                    onDelete={onDeleteFile}
+                                                                />
+                                                            ))}
                                                         </div>
                                                     </AccordionContent>
                                                 </AccordionItem>

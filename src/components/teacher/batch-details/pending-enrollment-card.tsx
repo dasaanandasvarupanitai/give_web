@@ -5,17 +5,6 @@ import {
     Card,
     CardContent,
 } from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Enrollment } from "@/lib/models/enrollment";
 import type { User } from "@/lib/models/user";
@@ -32,6 +21,7 @@ import {
     XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { EditStudentDialog } from "./edit-student-dialog";
 
 interface PendingEnrollmentCardProps {
     enrollment: Enrollment;
@@ -92,7 +82,6 @@ export function PendingEnrollmentCard({
         return null;
     }
 
-    // Prioritize diksha name for spiritual platform, then student name, then Google name
     const displayName = enrollment.dikshaName || enrollment.studentName || student.name;
     const hasAdditionalInfo = enrollment.studentName || enrollment.dikshaName || enrollment.whatsappNumber || enrollment.address;
 
@@ -103,12 +92,7 @@ export function PendingEnrollmentCard({
             whatsappNumber: enrollment.whatsappNumber || "",
             address: enrollment.address || "",
         };
-        setOriginalValues({
-            studentName: enrollment.studentName || "",
-            dikshaName: enrollment.dikshaName || "",
-            whatsappNumber: enrollment.whatsappNumber || "",
-            address: enrollment.address || "",
-        });
+        setOriginalValues(initialValues);
         setEditForm(initialValues);
         setShowEditDialog(true);
     };
@@ -139,11 +123,8 @@ export function PendingEnrollmentCard({
             const trimmedWhatsapp = editForm.whatsappNumber.trim();
             const trimmedAddress = editForm.address.trim();
 
-            // Build update object - only include fields that changed
             const updates: Partial<Enrollment> = {};
 
-            // Apply change detection to all fields for consistency
-            // Trim original values for comparison to avoid false positives from whitespace
             const originalStudentName = (originalValues.studentName || "").trim();
             if (trimmedStudentName !== originalStudentName) {
                 updates.studentName = trimmedStudentName;
@@ -289,90 +270,14 @@ export function PendingEnrollmentCard({
                 </div>
             </CardContent>
 
-            {/* Edit Dialog */}
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="w-[90%] max-w-md sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Edit Student Information</DialogTitle>
-                        <DialogDescription>
-                            Update the student's information. Changes will be saved immediately.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-pending-studentName">
-                                Certificate Name <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="edit-pending-studentName"
-                                placeholder="Enter certificate name"
-                                value={editForm.studentName}
-                                onChange={(e) => setEditForm({ ...editForm, studentName: e.target.value })}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-pending-dikshaName">Diksha Name (Optional)</Label>
-                            <Input
-                                id="edit-pending-dikshaName"
-                                placeholder="Enter diksha name"
-                                value={editForm.dikshaName}
-                                onChange={(e) => setEditForm({ ...editForm, dikshaName: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-pending-whatsappNumber">
-                                WhatsApp Number <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                                id="edit-pending-whatsappNumber"
-                                placeholder="Enter WhatsApp number with country code"
-                                value={editForm.whatsappNumber}
-                                onChange={(e) => setEditForm({ ...editForm, whatsappNumber: e.target.value })}
-                                type="tel"
-                                required
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Example: +1234567890
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-pending-address">Address (Optional)</Label>
-                            <Textarea
-                                id="edit-pending-address"
-                                placeholder="Enter address"
-                                value={editForm.address}
-                                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                                rows={3}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowEditDialog(false)}
-                            disabled={isSaving}
-                            className="w-full sm:w-auto"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSaveEdit}
-                            disabled={isSaving || !editForm.studentName.trim() || !editForm.whatsappNumber.trim()}
-                            className="w-full sm:w-auto"
-                        >
-                            {isSaving ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                "Save Changes"
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <EditStudentDialog
+                isOpen={showEditDialog}
+                onOpenChange={setShowEditDialog}
+                isSaving={isSaving}
+                formData={editForm}
+                onFormChange={setEditForm}
+                onSave={handleSaveEdit}
+            />
         </Card>
     );
 }

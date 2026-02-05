@@ -13,37 +13,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuthUser } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
+import { useTaskForm } from "@/hooks/use-task-form";
 import type { Task, TaskType } from "@/lib/models/task";
-import { createTask, updateTask } from "@/lib/services/firestore";
-import { dateFromBangladeshTime, dateToBangladeshTime } from "@/lib/utils";
-import {
-    BookOpen,
-    FileQuestion,
-    FileText,
-    Headphones,
-    Loader2,
-    Megaphone,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-
-const taskTypes: { value: TaskType; label: string; icon: typeof Headphones }[] = [
-    { value: "dailyListening", label: "Daily Listening", icon: Headphones },
-    { value: "cba", label: "CBA", icon: FileQuestion },
-    { value: "oba", label: "OBA", icon: FileText },
-    { value: "slokaMemorization", label: "Sloka Memorization", icon: BookOpen },
-    { value: "announcement", label: "Announcement", icon: Megaphone },
-];
+import { Headphones, Loader2 } from "lucide-react";
+import { TaskTypeSelector, taskTypes } from "./tasks/task-type-selector";
 
 interface TaskFormDialogProps {
     mode: "create" | "edit";
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    batchId?: string; // Required for create
-    teacherId?: string; // Required for create
-    batchName?: string; // Used in description for create
-    initialData?: Task; // Required for edit
+    batchId?: string;
+    teacherId?: string;
+    batchName?: string;
+    initialData?: Task;
     onSuccess?: () => void;
 }
 
@@ -57,157 +39,15 @@ export function TaskFormDialog({
     initialData,
     onSuccess,
 }: TaskFormDialogProps) {
-    const { user } = useAuthUser(); // Still valid as a fallback check
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { toast } = useToast();
-
-    const [formData, setFormData] = useState({
-        type: "dailyListening" as TaskType,
-        title: "",
-        description: "",
-        startDate: "",
-        dueDate: "",
-        maxPoints: "100",
-        allowLateSubmission: true,
-        lateSubmissionDays: "3",
-        instructions: "",
-        status: "published" as Task["status"],
+    const { formData, setFormData, isSubmitting, handleSubmit } = useTaskForm({
+        open,
+        mode,
+        initialData,
+        batchId,
+        teacherId,
+        onSuccess,
+        onOpenChange,
     });
-
-    // Reset or fill form when dialog opens or mode/data changes
-    useEffect(() => {
-        if (open) {
-            if (mode === "edit" && initialData) {
-                setFormData({
-                    type: initialData.type,
-                    title: initialData.title,
-                    description: initialData.description,
-                    startDate: initialData.startDate
-                        ? dateFromBangladeshTime(initialData.startDate)
-                        : "",
-                    dueDate: initialData.dueDate
-                        ? dateFromBangladeshTime(initialData.dueDate)
-                        : "",
-                    maxPoints: initialData.maxPoints.toString(),
-                    allowLateSubmission: initialData.allowLateSubmission,
-                    lateSubmissionDays: initialData.lateSubmissionDays.toString(),
-                    instructions: initialData.instructions || "",
-                    status: initialData.status,
-                });
-            } else if (mode === "create") {
-                setFormData({
-                    type: "dailyListening",
-                    title: "",
-                    description: "",
-                    startDate: "",
-                    dueDate: "",
-                    maxPoints: "100",
-                    allowLateSubmission: true,
-                    lateSubmissionDays: "3",
-                    instructions: "",
-                    status: "published", // Default for create
-                });
-            }
-        }
-    }, [open, mode, initialData]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.title.trim() || !formData.description.trim()) {
-            toast({
-                title: "Validation Error",
-                description: "Please fill in all required fields",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            const startDate = formData.startDate
-                ? dateToBangladeshTime(formData.startDate, 0, 0, 0, 0)
-                : undefined;
-
-            const dueDate =
-                formData.type !== "announcement" && formData.dueDate
-                    ? dateToBangladeshTime(formData.dueDate, 23, 59, 59, 999)
-                    : undefined;
-
-            const maxPoints =
-                formData.type === "announcement" ? 0 : parseInt(formData.maxPoints) || 100;
-
-            const allowLateSubmission =
-                formData.type === "announcement" ? false : formData.allowLateSubmission;
-
-            const lateSubmissionDays =
-                formData.type === "announcement"
-                    ? 0
-                    : parseInt(formData.lateSubmissionDays) || 3;
-
-            const instructions = formData.instructions.trim() || undefined;
-
-            if (mode === "create") {
-                if (!batchId || !teacherId) throw new Error("Missing batch or teacher ID");
-
-                await createTask({
-                    title: formData.title.trim(),
-                    description: formData.description.trim(),
-                    batchId,
-                    teacherId,
-                    type: formData.type,
-                    status: "published", // Always published on create per original file
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    startDate,
-                    dueDate,
-                    maxPoints,
-                    attachments: [],
-                    allowedFileTypes: ["pdf", "doc", "docx", "jpg", "jpeg", "png"],
-                    allowLateSubmission,
-                    lateSubmissionDays,
-                    instructions,
-                    submissionCount: 0,
-                });
-
-                toast({
-                    title: "Success",
-                    description: "Task created successfully",
-                });
-            } else {
-                // Edit Mode
-                if (!initialData?.id) throw new Error("Missing task ID");
-
-                await updateTask(initialData.id, {
-                    title: formData.title.trim(),
-                    description: formData.description.trim(),
-                    type: formData.type,
-                    status: formData.status,
-                    startDate,
-                    dueDate,
-                    maxPoints,
-                    allowLateSubmission,
-                    lateSubmissionDays,
-                    instructions,
-                });
-
-                toast({
-                    title: "Success",
-                    description: "Task updated successfully",
-                });
-            }
-
-            onOpenChange(false);
-            onSuccess?.();
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: error instanceof Error ? error.message : `Failed to ${mode} task`,
-                variant: "destructive",
-            });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
 
     const selectedTaskType = taskTypes.find((t) => t.value === formData.type);
     const TaskIcon = selectedTaskType?.icon || Headphones;
@@ -227,32 +67,14 @@ export function TaskFormDialog({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        {/* Task Type Selection */}
                         <div className="grid gap-2">
                             <Label>Task Type *</Label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {taskTypes.map((type) => {
-                                    const Icon = type.icon;
-                                    const isSelected = formData.type === type.value;
-                                    return (
-                                        <button
-                                            key={type.value}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, type: type.value })}
-                                            className={`p-3 border rounded-lg text-left transition-colors ${isSelected
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:bg-muted"
-                                                }`}
-                                        >
-                                            <Icon className="h-5 w-5 mb-2" />
-                                            <p className="text-sm font-medium">{type.label}</p>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <TaskTypeSelector
+                                selectedType={formData.type}
+                                onTypeChange={(type) => setFormData({ ...formData, type })}
+                            />
                         </div>
 
-                        {/* Basic Information */}
                         <div className="grid gap-2">
                             <Label htmlFor="title">Task Title *</Label>
                             <Input
@@ -282,10 +104,6 @@ export function TaskFormDialog({
                             />
                         </div>
 
-                        {/* Status (Only shown for Edit in original, but safe to hide/show or just always show if consistent. Original Create sets 'published' hardcoded but original Edit allows changing status. Let's show only in edit to stay EXACTLY same?)
-               Actually, Create strictly set it to 'published'. Edit showed the dropdown.
-               We can condition this UI block on mode === 'edit'.
-            */}
                         {mode === "edit" && (
                             <div className="grid gap-2">
                                 <Label htmlFor="status">Status *</Label>
@@ -308,7 +126,6 @@ export function TaskFormDialog({
                             </div>
                         )}
 
-                        {/* Start Date */}
                         <div className="grid gap-2">
                             <Label htmlFor="start-date">
                                 {mode === "create" ? "Start Date *" : "Start Date"}
@@ -330,7 +147,6 @@ export function TaskFormDialog({
                             </p>
                         </div>
 
-                        {/* Due Date and Points */}
                         {formData.type !== "announcement" && (
                             <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -365,7 +181,6 @@ export function TaskFormDialog({
                                     </div>
                                 </div>
 
-                                {/* Late Submission Settings */}
                                 <div className="space-y-4 p-4 border rounded-lg">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -404,7 +219,6 @@ export function TaskFormDialog({
                             </>
                         )}
 
-                        {/* Instructions */}
                         <div className="grid gap-2">
                             <Label htmlFor="instructions">Additional Instructions (Optional)</Label>
                             <Textarea

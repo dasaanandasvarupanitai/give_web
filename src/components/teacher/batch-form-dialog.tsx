@@ -12,16 +12,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { useBatchForm } from "@/hooks/use-batch-form";
 import type { Batch } from "@/lib/models/batch";
-import {
-    createBatch,
-    generateBatchCode,
-    getBatchByClassCode,
-    updateBatch,
-} from "@/lib/services/firestore";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
 
 interface BatchFormDialogProps {
     open: boolean;
@@ -44,130 +37,21 @@ export function BatchFormDialog({
     teacherId,
     onSuccess,
 }: BatchFormDialogProps) {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { toast } = useToast();
-
-    const [formData, setFormData] = useState({
-        name: "",
-        description: "",
-        startDate: "",
-        classCode: "",
+    const {
+        formData,
+        setFormData,
+        isSubmitting,
+        handleSubmit,
+        handleGenerateCode,
+    } = useBatchForm({
+        open,
+        mode,
+        initialData,
+        courseGroupId,
+        teacherId,
+        onSuccess,
+        onOpenChange,
     });
-
-    // Reset or fill form when dialog opens or data changes
-    useEffect(() => {
-        if (open) {
-            if (mode === "edit" && initialData) {
-                setFormData({
-                    name: initialData.name,
-                    description: initialData.description,
-                    startDate: initialData.startDate
-                        ? new Date(initialData.startDate).toISOString().split("T")[0]
-                        : "",
-                    classCode: "", // Class code is not editable
-                });
-            } else {
-                setFormData({
-                    name: "",
-                    description: "",
-                    startDate: "",
-                    classCode: "",
-                });
-            }
-        }
-    }, [open, mode, initialData]);
-
-    const handleGenerateCode = () => {
-        setFormData({ ...formData, classCode: generateBatchCode() });
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!teacherId || !courseGroupId) return;
-
-        if (!formData.name.trim() || !formData.description.trim()) {
-            toast({
-                title: "Validation Error",
-                description: "Please fill in all required fields",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            if (mode === "edit" && initialData) {
-                await updateBatch(initialData.id, {
-                    name: formData.name.trim(),
-                    description: formData.description.trim(),
-                    startDate: formData.startDate ? new Date(formData.startDate) : undefined,
-                });
-                toast({
-                    title: "Success",
-                    description: "Batch updated successfully",
-                });
-            } else {
-                // Use custom code if provided, otherwise generate one
-                let batchCode = formData.classCode.trim().toUpperCase();
-
-                // Validate custom code if provided
-                if (batchCode) {
-                    // Validate format: 3-20 characters, no spaces
-                    if (!/^[^\s]{3,20}$/.test(batchCode)) {
-                        toast({
-                            title: "Invalid Class Code",
-                            description: "Class code must be 3-20 characters and cannot contain spaces.",
-                            variant: "destructive",
-                        });
-                        setIsSubmitting(false);
-                        return;
-                    }
-
-                    // Check if code already exists
-                    const existingBatch = await getBatchByClassCode(batchCode);
-                    if (existingBatch) {
-                        toast({
-                            title: "Class Code Already Exists",
-                            description: "This class code is already in use. Please choose a different code.",
-                            variant: "destructive",
-                        });
-                        setIsSubmitting(false);
-                        return;
-                    }
-                } else {
-                    // Generate random code if not provided
-                    batchCode = generateBatchCode();
-                }
-
-                await createBatch({
-                    name: formData.name.trim(),
-                    description: formData.description.trim(),
-                    courseGroupId: courseGroupId,
-                    teacherId: teacherId,
-                    classCode: batchCode,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    isActive: true,
-                    studentCount: 0,
-                    startDate: formData.startDate ? new Date(formData.startDate) : undefined,
-                });
-                toast({
-                    title: "Success",
-                    description: `Batch created! Class code: ${batchCode}`,
-                });
-            }
-            onOpenChange(false);
-            onSuccess?.();
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: error instanceof Error ? error.message : "Failed to save batch",
-                variant: "destructive",
-            });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

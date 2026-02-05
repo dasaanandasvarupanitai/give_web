@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,18 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import type { CourseGroup } from "@/lib/models/course-group";
@@ -29,8 +16,10 @@ import {
   subscribeCourseGroups,
   updateCourseGroup
 } from "@/lib/services/firestore";
-import { Edit, Folder, Loader2, Plus, Trash2 } from "lucide-react";
+import { Folder, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CourseGroupCard } from "./course-groups/course-group-card";
+import { CourseGroupFormDialog } from "./course-groups/course-group-form-dialog";
 
 export function CourseGroupsManagement() {
   const { user } = useAuthUser();
@@ -50,7 +39,6 @@ export function CourseGroupsManagement() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Subscribe to real-time updates
     const unsubscribe = subscribeCourseGroups(user.uid, (groups) => {
       setCourseGroups(groups);
       setLoading(false);
@@ -62,7 +50,6 @@ export function CourseGroupsManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.uid) {
-      console.error("No user UID found");
       toast({
         title: "Error",
         description: "You must be logged in to create a course group",
@@ -70,7 +57,6 @@ export function CourseGroupsManagement() {
       });
       return;
     }
-    console.log("Form submitted, user UID:", user.uid, "email:", user.email);
 
     if (!formData.name.trim() || !formData.description.trim()) {
       toast({
@@ -93,12 +79,7 @@ export function CourseGroupsManagement() {
           description: "Course group updated successfully",
         });
       } else {
-        console.log("Creating course group with data:", {
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          teacherId: user.uid,
-        });
-        const courseGroupId = await createCourseGroup({
+        await createCourseGroup({
           name: formData.name.trim(),
           description: formData.description.trim(),
           teacherId: user.uid,
@@ -107,7 +88,6 @@ export function CourseGroupsManagement() {
           isActive: true,
           batchCount: 0,
         });
-        console.log("Course group created successfully with ID:", courseGroupId);
         toast({
           title: "Success",
           description: "Course group created successfully",
@@ -116,7 +96,6 @@ export function CourseGroupsManagement() {
       setIsDialogOpen(false);
       resetForm();
     } catch (error) {
-      console.error("Error creating/updating course group:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save course group",
@@ -163,6 +142,16 @@ export function CourseGroupsManagement() {
     setEditingId(null);
   };
 
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) resetForm();
+  };
+
+  const handleCancel = () => {
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
   if (loading) {
     return (
       <Card>
@@ -188,85 +177,16 @@ export function CourseGroupsManagement() {
               Organize your courses into groups
             </CardDescription>
           </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Course Group
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[95vw] sm:w-full">
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>
-                    {isEditing ? "Edit Course Group" : "Create Course Group"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {isEditing
-                      ? "Update the course group details"
-                      : "Create a new course group to organize your courses"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Course Group Name *</Label>
-                    <Input
-                      id="name"
-                      placeholder="e.g., ISKCON Disciple Course"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description *</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe what this course group covers..."
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({ ...formData, description: e.target.value })
-                      }
-                      rows={4}
-                      required
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isEditing ? "Updating..." : "Creating..."}
-                      </>
-                    ) : isEditing ? (
-                      "Update"
-                    ) : (
-                      "Create"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <CourseGroupFormDialog
+            isOpen={isDialogOpen}
+            onOpenChange={handleDialogOpenChange}
+            isEditing={isEditing}
+            isSubmitting={isSubmitting}
+            formData={formData}
+            onFormChange={setFormData}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -278,45 +198,12 @@ export function CourseGroupsManagement() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {courseGroups.map((group) => (
-              <Card key={group.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">{group.name}</CardTitle>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(group)}
-                        className="border border-orange-500"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(group.id)}
-                        className="text-destructive hover:text-destructive border border-orange-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="mb-4">
-                    {group.description}
-                  </CardDescription>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{group.batchCount} batches</span>
-                    <span>
-                      Created {new Date(group.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <CourseGroupCard
+                key={group.id}
+                group={group}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}

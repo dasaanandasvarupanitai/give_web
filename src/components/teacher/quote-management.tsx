@@ -1,25 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
 } from "@/components/ui/card";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Quote } from "@/lib/models/quote";
 import {
@@ -28,8 +12,10 @@ import {
     subscribeQuotes,
     updateQuote
 } from "@/lib/services/firestore";
-import { Edit, Loader2, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Loader2, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
+import { QuoteCard } from "./quotes/quote-card";
+import { QuoteFormDialog } from "./quotes/quote-form-dialog";
 
 export function QuoteManagement() {
     const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -47,7 +33,6 @@ export function QuoteManagement() {
     });
 
     useEffect(() => {
-        // Subscribe to real-time updates
         const unsubscribe = subscribeQuotes((quotesList) => {
             setQuotes(quotesList);
             setLoading(false);
@@ -94,7 +79,6 @@ export function QuoteManagement() {
             setIsDialogOpen(false);
             resetForm();
         } catch (error) {
-            console.error("Error saving quote:", error);
             toast({
                 title: "Error",
                 description: error instanceof Error ? error.message : "Failed to save quote",
@@ -128,7 +112,6 @@ export function QuoteManagement() {
                 description: "Quote deleted successfully",
             });
         } catch (error) {
-            console.error("Error deleting quote:", error);
             toast({
                 title: "Error",
                 description: error instanceof Error ? error.message : "Failed to delete quote",
@@ -171,81 +154,16 @@ export function QuoteManagement() {
                         Manage quotes displayed in the quote carousel
                     </p>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => resetForm()} className="border border-orange-500">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Quote
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <form onSubmit={handleSubmit}>
-                            <DialogHeader>
-                                <DialogTitle>{isEditing ? "Edit Quote" : "Add Quote"}</DialogTitle>
-                                <DialogDescription>
-                                    {isEditing
-                                        ? "Update the quote details below."
-                                        : "Add a new quote to display in the quote carousel."}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="quote">Quote *</Label>
-                                    <Textarea
-                                        id="quote"
-                                        placeholder="Enter the quote text..."
-                                        value={formData.quote}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, quote: e.target.value })
-                                        }
-                                        required
-                                        rows={4}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="author">Author *</Label>
-                                    <Input
-                                        id="author"
-                                        placeholder="Enter author name..."
-                                        value={formData.author}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, author: e.target.value })
-                                        }
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="date">Date (Optional)</Label>
-                                    <Input
-                                        id="date"
-                                        placeholder="e.g., Lecture, Śrīmad-Bhāgavatam 1.10.4, Māyāpura, June 19, 1973"
-                                        value={formData.date}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, date: e.target.value })
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleDialogOpenChange(false)}
-                                    disabled={isSubmitting}
-                                    className="border border-orange-500"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting} className="border border-orange-500">
-                                    {isSubmitting && (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    {isEditing ? "Update" : "Create"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                <QuoteFormDialog
+                    isOpen={isDialogOpen}
+                    onOpenChange={handleDialogOpenChange}
+                    isEditing={isEditing}
+                    isSubmitting={isSubmitting}
+                    formData={formData}
+                    onFormChange={setFormData}
+                    onSubmit={handleSubmit}
+                    onReset={resetForm}
+                />
             </div>
 
             {quotes.length === 0 ? (
@@ -258,40 +176,15 @@ export function QuoteManagement() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {quotes.map((quote) => (
-                        <Card key={quote.id}>
-                            <CardHeader>
-                                <CardTitle className="text-base line-clamp-2">
-                                    {quote.quote.substring(0, 60)}...
-                                </CardTitle>
-                                <CardDescription>— {quote.author}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleEdit(quote)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Edit className="h-4 w-4 mr-1" />
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDelete(quote.id)}
-                                        className="border border-orange-500"
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Delete
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <QuoteCard
+                            key={quote.id}
+                            quote={quote}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                        />
                     ))}
                 </div>
             )}
         </div>
     );
 }
-
