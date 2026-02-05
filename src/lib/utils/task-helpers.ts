@@ -57,3 +57,54 @@ export function getTaskTypeColor(type: TaskType): string {
       return "#6b7280"; // gray
   }
 }
+
+/**
+ * Calculate the display status for a task in the teacher dashboard
+ * - "scheduled": Task has startDate in the future (not yet visible to students)
+ * - "published": Task is currently visible to students (startDate has passed, but not closed)
+ * - "closed": Task is past its deadline (dueDate + grace period/late submission window)
+ */
+import type { Task } from "@/lib/models/task";
+
+export function getTaskDisplayStatus(task: Task): "scheduled" | "published" | "closed" {
+  const now = new Date();
+
+  // Check if task is scheduled (startDate is in the future)
+  if (task.startDate) {
+    const startDate = new Date(task.startDate);
+    if (now < startDate) {
+      return "scheduled";
+    }
+  }
+
+  // For announcements, they're either scheduled or published (never closed)
+  if (task.type === "announcement") {
+    return "published";
+  }
+
+  // Check if task is closed (past due date/late submission)
+  if (task.dueDate) {
+    const dueDate = new Date(task.dueDate);
+    let deadline: Date;
+
+    if (task.allowLateSubmission && task.lateSubmissionDays > 0) {
+      // Late submission allowed: deadline is dueDate + lateSubmissionDays (11:59:59 PM on last day)
+      deadline = new Date(dueDate);
+      deadline.setDate(deadline.getDate() + task.lateSubmissionDays);
+      deadline.setHours(23, 59, 59, 999);
+    } else {
+      // No late submission: deadline is exactly the due date (grace period disabled)
+      // To re-enable 2-hour grace period, uncomment the following lines:
+      // const gracePeriodMs = 2 * 60 * 60 * 1000; // 2 hours
+      // deadline = new Date(dueDate.getTime() + gracePeriodMs);
+      deadline = dueDate;
+    }
+
+    if (now > deadline) {
+      return "closed";
+    }
+  }
+
+  // Task is published (startDate has passed or no startDate, and not closed)
+  return "published";
+}

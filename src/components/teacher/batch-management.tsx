@@ -8,17 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,23 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch } from "@/lib/models/batch";
 import type { CourseGroup } from "@/lib/models/course-group";
 import {
-  createBatch,
   deleteBatch,
-  generateBatchCode,
-  getBatchByClassCode,
   getCourseGroups,
   subscribeBatchesByCourseGroup,
-  updateBatch
 } from "@/lib/services/firestore";
 import { Check, Copy, Edit, Loader2, Plus, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BatchFormDialog } from "./batch-form-dialog";
 
 export function BatchManagement() {
   const { user } = useAuthUser();
@@ -52,19 +38,14 @@ export function BatchManagement() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedCourseGroupId, setSelectedCourseGroupId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    startDate: "",
-    classCode: "",
-  });
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -106,105 +87,15 @@ export function BatchManagement() {
     return unsubscribe;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user?.uid || !selectedCourseGroupId) return;
-
-    if (!formData.name.trim() || !formData.description.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      if (isEditing && editingId) {
-        await updateBatch(editingId, {
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          startDate: formData.startDate ? new Date(formData.startDate) : undefined,
-        });
-        toast({
-          title: "Success",
-          description: "Batch updated successfully",
-        });
-      } else {
-        // Use custom code if provided, otherwise generate one
-        let batchCode = formData.classCode.trim().toUpperCase();
-
-        // Validate custom code if provided
-        if (batchCode) {
-          // Validate format: 3-20 characters, no spaces
-          if (!/^[^\s]{3,20}$/.test(batchCode)) {
-            toast({
-              title: "Invalid Class Code",
-              description: "Class code must be 3-20 characters and cannot contain spaces.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-
-          // Check if code already exists
-          const existingBatch = await getBatchByClassCode(batchCode);
-          if (existingBatch) {
-            toast({
-              title: "Class Code Already Exists",
-              description: "This class code is already in use. Please choose a different code.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          // Generate random code if not provided
-          batchCode = generateBatchCode();
-        }
-
-        await createBatch({
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          courseGroupId: selectedCourseGroupId,
-          teacherId: user.uid,
-          classCode: batchCode,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isActive: true,
-          studentCount: 0,
-          startDate: formData.startDate ? new Date(formData.startDate) : undefined,
-        });
-        toast({
-          title: "Success",
-          description: `Batch created! Class code: ${batchCode}`,
-        });
-      }
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save batch",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleCreate = () => {
+    setDialogMode("create");
+    setSelectedBatch(null);
+    setIsDialogOpen(true);
   };
 
   const handleEdit = (batch: Batch) => {
-    setFormData({
-      name: batch.name,
-      description: batch.description,
-      startDate: batch.startDate
-        ? new Date(batch.startDate).toISOString().split("T")[0]
-        : "",
-      classCode: "",
-    });
-    setIsEditing(true);
-    setEditingId(batch.id);
+    setDialogMode("edit");
+    setSelectedBatch(batch);
     setIsDialogOpen(true);
   };
 
@@ -242,16 +133,6 @@ export function BatchManagement() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const resetForm = () => {
-    setFormData({ name: "", description: "", startDate: "", classCode: "" });
-    setIsEditing(false);
-    setEditingId(null);
-  };
-
-  const handleGenerateCode = () => {
-    setFormData({ ...formData, classCode: generateBatchCode() });
-  };
-
   const selectedCourseGroup = courseGroups.find(
     (cg) => cg.id === selectedCourseGroupId
   );
@@ -281,143 +162,32 @@ export function BatchManagement() {
               Create and manage batches for your course groups
             </CardDescription>
           </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}
+
+          <Button
+            onClick={handleCreate}
+            disabled={!selectedCourseGroupId || courseGroups.length === 0}
+            className="w-full sm:w-auto border border-orange-500"
           >
-            <DialogTrigger asChild>
-              <Button disabled={!selectedCourseGroupId || courseGroups.length === 0} className="w-full sm:w-auto border border-orange-500">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Batch
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl w-[90vw] sm:w-full max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-4 sm:p-6">
-              <form onSubmit={handleSubmit}>
-                <DialogHeader className="text-left space-y-1.5 sm:space-y-2">
-                  <DialogTitle className="text-lg sm:text-xl md:text-2xl">
-                    {isEditing ? "Edit Batch" : "Create Batch"}
-                  </DialogTitle>
-                  <DialogDescription className="text-sm sm:text-base">
-                    {isEditing
-                      ? "Update the batch details"
-                      : "Create a new batch for students to join"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 sm:gap-5 py-4 sm:py-6">
-                  {selectedCourseGroup && (
-                    <div className="p-3 sm:p-4 bg-muted rounded-lg">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Course Group</p>
-                      <p className="font-medium text-sm sm:text-base mt-1">{selectedCourseGroup.name}</p>
-                    </div>
-                  )}
-                  <div className="grid gap-2">
-                    <Label htmlFor="batch-name" className="text-sm sm:text-base">Batch Name *</Label>
-                    <Input
-                      id="batch-name"
-                      placeholder="e.g., Batch 1 - Morning"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="batch-description" className="text-sm sm:text-base">Description *</Label>
-                    <Textarea
-                      id="batch-description"
-                      placeholder="Describe the batch, schedule, and any special instructions..."
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({ ...formData, description: e.target.value })
-                      }
-                      rows={4}
-                      className="text-sm sm:text-base resize-none"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="start-date" className="text-sm sm:text-base">Start Date</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, startDate: e.target.value })
-                      }
-                      className="text-sm sm:text-base"
-                    />
-                  </div>
-                  {!isEditing && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="class-code" className="text-sm sm:text-base">
-                        Class Code (Optional)
-                        <span className="text-xs text-muted-foreground ml-1 sm:ml-2 block sm:inline">
-                          Leave empty to auto-generate
-                        </span>
-                      </Label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Input
-                          id="class-code"
-                          placeholder="e.g., BATCH-1, CLASS_2024!"
-                          value={formData.classCode}
-                          onChange={(e) =>
-                            setFormData({ ...formData, classCode: e.target.value.toUpperCase() })
-                          }
-                          maxLength={20}
-                          className="flex-1 text-sm sm:text-base"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleGenerateCode}
-                          className="border border-orange-500 text-sm sm:text-base whitespace-nowrap"
-                        >
-                          Generate
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        3-20 characters. Must be unique.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4 sm:mt-6">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      resetForm();
-                    }}
-                    className="border border-orange-500 w-full sm:w-auto text-sm sm:text-base"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="border border-orange-500 w-full sm:w-auto text-sm sm:text-base"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isEditing ? "Updating..." : "Creating..."}
-                      </>
-                    ) : isEditing ? (
-                      "Update"
-                    ) : (
-                      "Create"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Batch
+          </Button>
+
+          {user?.uid && selectedCourseGroupId && (
+            <BatchFormDialog
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
+              mode={dialogMode}
+              initialData={selectedBatch}
+              courseGroupId={selectedCourseGroupId}
+              courseGroupName={selectedCourseGroup?.name}
+              teacherId={user.uid}
+              onSuccess={() => {
+                // Determine if we need to reload anything or if subscription handles it
+                // Subscription handles list updates, so nothing manual needed
+              }}
+            />
+          )}
+
         </div>
       </CardHeader>
       <CardContent>

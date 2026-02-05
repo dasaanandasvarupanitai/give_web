@@ -1,5 +1,6 @@
 "use client";
 
+import { AboutPageManager } from "@/components/admin/about-page-manager";
 import { CourseManagement } from "@/components/teacher/course-management";
 import { QuoteManagement } from "@/components/teacher/quote-management";
 import { TestimonialManagement } from "@/components/teacher/testimonial-management";
@@ -16,68 +17,21 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeacher } from "@/hooks/use-teacher";
-import {
-    getAboutPage,
-    getAllAboutPages,
-    setAboutPage,
-    type AboutPage,
-    type AboutSection,
-} from "@/lib/services/firestore";
 import { SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 
 export default function AdminPage() {
     const { isTeacher, initializing, user } = useTeacher();
     const router = useRouter();
-
-    // About pages state
-    const [aboutPages, setAboutPages] = useState<AboutPage[]>([]);
-    const [selectedAboutSlug, setSelectedAboutSlug] = useState<string>("");
-    const [activeAboutPage, setActiveAboutPage] = useState<AboutPage | null>(null);
-    const [savingAbout, setSavingAbout] = useState(false);
 
     useEffect(() => {
         if (!initializing && (!user || !isTeacher)) {
             router.push("/");
         }
     }, [isTeacher, initializing, user, router]);
-
-    useEffect(() => {
-        if (!user || !isTeacher) return;
-
-        (async () => {
-            const pages = await getAllAboutPages();
-            setAboutPages(pages);
-            if (pages.length > 0) {
-                // Ensure we always have a valid selected slug from the collection
-                const hasCurrent = pages.some((p) => p.slug === selectedAboutSlug);
-                if (!hasCurrent) {
-                    setSelectedAboutSlug(pages[0].slug);
-                }
-            }
-        })();
-    }, [user, isTeacher, selectedAboutSlug]);
-
-    useEffect(() => {
-        if (!selectedAboutSlug) return;
-
-        (async () => {
-            const page = await getAboutPage(selectedAboutSlug);
-            if (page) {
-                setActiveAboutPage(page);
-            }
-        })();
-    }, [selectedAboutSlug]);
-
-    const selectedAboutName = useMemo(() => {
-        const found = aboutPages.find((p) => p.slug === selectedAboutSlug);
-        return found?.name ?? "About page";
-    }, [aboutPages, selectedAboutSlug]);
 
     if (initializing) {
         return (
@@ -102,57 +56,6 @@ export default function AdminPage() {
             </div>
         );
     }
-
-    const getSectionContent = (section: AboutSection): string => {
-        const paragraphs = section.paragraphs ?? [];
-        if (paragraphs.length === 0) return "";
-        if (paragraphs.length === 1) return paragraphs[0] ?? "";
-        // For legacy data with multiple plain paragraphs, join them as simple HTML.
-        return paragraphs.map((p) => `<p>${p}</p>`).join("\n");
-    };
-
-    const handleAboutSectionContentChange = (sectionId: string, value: string) => {
-        if (!activeAboutPage) return;
-
-        const nextSections: AboutSection[] = activeAboutPage.sections.map((section) => {
-            if (section.id !== sectionId) return section;
-            return {
-                ...section,
-                // Store a single HTML blob per section in paragraphs[0]
-                paragraphs: [value],
-            };
-        });
-
-        setActiveAboutPage({
-            ...activeAboutPage,
-            sections: nextSections,
-        });
-    };
-
-    const handleAboutTitleChange = (value: string) => {
-        if (!activeAboutPage) return;
-        setActiveAboutPage({
-            ...activeAboutPage,
-            heroTitle: value,
-        });
-    };
-
-    const handleSaveAbout = async () => {
-        if (!activeAboutPage) return;
-
-        try {
-            setSavingAbout(true);
-            await setAboutPage({
-                slug: activeAboutPage.slug,
-                name: activeAboutPage.name,
-                heroTitle: activeAboutPage.heroTitle,
-                heroSubtitle: activeAboutPage.heroSubtitle,
-                sections: activeAboutPage.sections,
-            });
-        } finally {
-            setSavingAbout(false);
-        }
-    };
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -192,86 +95,60 @@ export default function AdminPage() {
                                 moved out of the teacher dashboard so this page serves as your
                                 central admin for courses, quotes, testimonials, and About text.
                             </p>
+
+                            <AboutPageManager />
+
                             <Accordion
                                 type="single"
                                 collapsible
                                 className="w-full space-y-2"
                             >
-                                <AccordionItem value="about">
-                                    <AccordionTrigger className="text-base font-semibold">
-                                        About pages
-                                    </AccordionTrigger>
-                                    <AccordionContent className="pt-2 space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="about-page-select">Select page</Label>
-                                            <select
-                                                id="about-page-select"
-                                                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                                value={selectedAboutSlug}
-                                                onChange={(e) => setSelectedAboutSlug(e.target.value)}
-                                            >
-                                                {aboutPages.map((page) => (
-                                                    <option key={page.slug} value={page.slug}>
-                                                        {page.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {activeAboutPage && (
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <Label className="block text-sm font-medium">
-                                                        Page title (hero)
-                                                    </Label>
-                                                    <input
-                                                        className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                                        value={activeAboutPage.heroTitle ?? ""}
-                                                        onChange={(e) => handleAboutTitleChange(e.target.value)}
-                                                    />
-                                                </div>
-
-                                                {activeAboutPage.sections.map((section) => (
-                                                    <Card key={section.id}>
-                                                        <CardHeader>
-                                                            <CardTitle className="text-base flex items-center justify-between gap-2">
-                                                                <span>{section.id}</span>
-                                                                <span className="text-xs font-normal text-muted-foreground">
-                                                                    Layout: {section.layout}
-                                                                    {section.imagePath ? ` • Image: ${section.imagePath}` : ""}
-                                                                </span>
-                                                            </CardTitle>
-                                                        </CardHeader>
-                                                        <CardContent className="space-y-3">
-                                                            <div className="space-y-1">
-                                                                <Label className="block text-xs font-medium">
-                                                                    Section content
-                                                                </Label>
-                                                                <RichTextEditor
-                                                                    value={getSectionContent(section)}
-                                                                    onChange={(val: string) =>
-                                                                        handleAboutSectionContentChange(section.id, val)
-                                                                    }
-                                                                    placeholder="Edit section content..."
-                                                                />
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
-                                                ))}
-
-                                                <div className="flex justify-end">
-                                                    <Button
-                                                        type="button"
-                                                        onClick={handleSaveAbout}
-                                                        disabled={savingAbout}
-                                                    >
-                                                        {savingAbout ? "Saving..." : `Save "${selectedAboutName}" content`}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </AccordionContent>
-                                </AccordionItem>
+                                {/* AboutPageManager handles its own AccordionItem, 
+                    but here we are nesting it or keeping it parallel?
+                    The AboutPageManager returns an Accordion structure.
+                    
+                    Wait, `AboutPageManager` returns a full Accordion with one item "about".
+                    I shouldn't nest Accordion inside Accordion if I want them to look like siblings.
+                    However, the original code had one Accordion with values "about", "courses", "quotes", "testimonials".
+                    
+                    If `AboutPageManager` returns an Accordion, I can't put it directly inside another Accordion as an Item easily without breaking the flow.
+                    
+                    Let's check `AboutPageManager` again.
+                    It wraps content in:
+                    <Accordion type="single" collapsible className="w-full space-y-2">
+                      <AccordionItem value="about">...</AccordionItem>
+                    </Accordion>
+                    
+                    This means I can't easily merge it with the other items if I want them in the *same* accordion group (i.e. only one open at a time across all).
+                    But visual consistency is fine if they are stacked.
+                    
+                    Alternative: `AboutPageManager` should export `AboutPageManagerContent` which is the CONTENT of the accordion item, 
+                    OR `AboutPageManager` should be an AccordionItem itself.
+                    
+                    Current implementation of `AboutPageManager` includes the `Accordion` wrapper.
+                    So I should place it *outside* the main Accordion below, or refactor it.
+                    
+                    Merging 4 separate Accordions is fine, or I can just stack them.
+                    Actually, the original behavior had them all in one Accordion (type="single").
+                    If I separate them, multiple can be open at once (unless I control state, which I don't want to complicate).
+                    
+                    Let's just stack them. `AboutPageManager` is one block.
+                    Then the rest can be another block or separate blocks.
+                    
+                    Let's keep `AboutPageManager` as is. 
+                    And below it, I will put the other items.
+                    
+                    Actually, to make them look uniform, I should probably put them all in their own separate Accordions or Cards, 
+                    OR just have `AboutPageManager` return the `AccordionItem`?
+                    But `AccordionItem` relies on Context from `Accordion`. so it MUST be inside `Accordion`.
+                    
+                    So I will put `AboutPageManager` first.
+                    Then another `Accordion` for the rest?
+                    
+                    Actually, `AboutPageManager` is quite heavy. 
+                    Let's just render `AboutPageManager` (which has the accordion)
+                    and then render the others in a separate Accordion.
+                */}
 
                                 <AccordionItem value="courses">
                                     <AccordionTrigger className="text-base font-semibold">
@@ -302,10 +179,8 @@ export default function AdminPage() {
                             </Accordion>
                         </CardContent>
                     </Card>
-
                 </TabsContent>
             </Tabs>
         </div>
     );
 }
-
