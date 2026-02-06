@@ -11,7 +11,8 @@ import { SubmissionsList } from "@/components/teacher/submissions/submissions-li
 import { useTeacher } from "@/hooks/use-teacher";
 import { useToast } from "@/hooks/use-toast";
 import { useSubmissionHandlers } from "@/hooks/use-submission-handlers";
-import { useSubmissionsData, getFileType } from "@/hooks/use-submissions-data";
+import { useSubmissionsData } from "@/hooks/use-submissions-data";
+import { getFileType } from "@/lib/utils/file-helpers";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

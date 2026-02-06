@@ -13,16 +13,16 @@ import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { LinkifiedText } from "@/components/ui/linkified-text";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useBatchTasksData } from "@/hooks/use-batch-tasks-data";
 import {
-  useBatchTasksData,
   getSubmissionStatus,
   getTaskDisplayStatus,
-  isTaskOverdue,
-  isTaskDueSoon,
-  isLateSubmissionAllowed,
   getRemainingLateSubmissionDays,
+  isLateSubmissionAllowed,
   isTaskClickable,
-} from "@/hooks/use-batch-tasks-data";
+  isTaskDueSoon,
+  isTaskOverdue,
+} from "@/lib/utils/task-status";
 import { isWithinGracePeriod } from "@/lib/utils";
 import {
   getTaskTypeColor,
