@@ -5,14 +5,14 @@ import { getAboutPage, type AboutPage } from "@/lib/services/firestore";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-const FALLBACK_TITLE =
-  "HG Mani Gopal Das";
+// Fallback content - shown only if Firestore fails to load
+const FALLBACK_TITLE = "HG Mani Gopal Das";
 const FALLBACK_INTRO =
   "Born to a religious family, originally hailing from Barrackpore, North Calcutta; Mani Gopal Das came in contact with Krishna consciousness in 1992 by the inspiration of his parents. He started to give classes on Bhagavad Gita when he was only eight. He received spiritual initiation, at the age of eleven, in January 1997 in the line of Brahma-Madhva-Gaudiya parampara from His Holiness Jayapataka Swami Maharaja, a dedicated disciple of HDG A.C Bhaktivedanta Swami Prabhupada, the Founder-Acarya of International Society for Krishna Consciousness.";
 const FALLBACK_P1 =
-  "Academically, he holds a master’s degree in International Relations from a renowned university. He completed Bhakti Sastri, Bhakti Vaibhava, Bhakti Vedanta, TTC 1 and 2, BSTTC, IDCTTC and Spiritual Leadership Course. He is also qualified in the deity worship training and yajna samskara courses. Mani Gopal Das got many years of experience in the field of youth preaching in different colleges and universities, delivering speeches in various educational institutions and organisations on the teachings of Bhagavad Gita and other ancient Vedic literatures. He is an accomplished congregational preacher as well, who counselled numerous grihasthas in Krishna conscious family life. What made him truly distinct is his uncompromising yet pragmatic approach in presenting Krishna consciousness based on Srila Prabhupada’s teachings. He is well-known amidst his preaching circle mainly for his strong adherence and unwavering allegiance to the teachings of Srila Prabhupada and traditional vaisnava culture and yet caring personal demeanor. He is an adept sastric teacher for presenting the philosophy in unadulterated yet heart-touching way.";
+  "Academically, he holds a master's degree in International Relations from a renowned university. He completed Bhakti Vedanta and Spiritual Leadership Course as per his spiritual master's order. He is also qualified in the deity worship training under the supervision of HG Pankajanghri Prabhu and HG Jananivasa Prabhu. Mani Gopal Das got decades of experience in the field of youth preaching in different colleges and universities, delivering speeches in various educational institutions and organizations on the teachings of Bhagavad Gita and other ancient Vedic literatures. He is an accomplished congregational preacher as well, who counselled numerous grihasthas in Krishna conscious family life. What makes him truly distinct is his uncompromising yet pragmatic approach in presenting Krishna consciousness based on Srila Prabhupada's and Srila Bhaktisiddhanta Sarasvati Thakura Prabhupada's teachings. <b>He is well-known amidst his preaching circle mainly for his strong adherence and unwavering allegiance to the teachings of Srila Prabhupada and traditional vaisnava culture and yet caring personal demeanor.</b> He is an adept sastric teacher for presenting the philosophy in unadulterated and heart-touching way.";
 const FALLBACK_P2 =
-  "Currently he is serving at the office of his spiritual master in Sridham Mayapur as well as teaching sastric courses in different places through online and onsite. With his spiritual master’s blessings, he is heading the Gaura-vāṇī Institute for Vaiṣṇava Education, affiliated to ISKCON Ministry of Education and an authorised exam center under ISKCON Board of Examinations. Additionally, he is one of the core admin members in the globally renowned online repository of Srila Prabhupada’s teachings – Vanipedia; Prabhupada Network Team (Mayapur) and member of ISKCON Teachers’ Board in Ministry of Education, ISKCON.";
+  "Currently he is serving at the office of his spiritual master in Sridham Mayapur as well as teaching sastric courses in different places through online and onsite. With his spiritual master's blessings, he is heading the Gaura-vāṇī Institute for Vaiṣṇava Education, affiliated to ISKCON Ministry of Education and an authorised exam center under ISKCON Board of Examinations. Additionally, he is one of the core admin members in the globally renowned online repository of Srila Prabhupada's teachings – Vanipedia; Prabhupada Network Team (Mayapur) and member of ISKCON Teachers' Board in Ministry of Education, ISKCON.";
 
 export default function GivePage() {
   const [page, setPage] = useState<AboutPage | null>(null);
@@ -30,6 +30,7 @@ export default function GivePage() {
     };
   }, []);
 
+  // Use Firestore data if available, otherwise fallback
   const heroTitle = page?.heroTitle ?? FALLBACK_TITLE;
   const introSection = page?.sections.find((s) => s.id === "intro");
   const introText = introSection?.paragraphs?.[0] ?? FALLBACK_INTRO;
@@ -46,7 +47,7 @@ export default function GivePage() {
                 <h1 className="text-3xl md:text-4xl font-headline font-bold text-foreground mb-6">
                   {heroTitle}
                 </h1>
-                <p>{introText}</p>
+                <p dangerouslySetInnerHTML={{ __html: introText }} />
               </div>
             </AnimatedSection>
           </div>
