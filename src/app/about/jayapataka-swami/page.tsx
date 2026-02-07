@@ -136,7 +136,7 @@ export default function JayapatakaSwamiPage() {
                     // Signature section - "Your well-wisher always" starts the signature block with border
                     if (isSignatureStart) {
                       return (
-                        <div key={idx} className={`${baseClasses} font-bold mt-8 border-t pt-4`} dangerouslySetInnerHTML={{ __html: p }} />
+                        <div key={idx} className={`${baseClasses} mt-8 border-t pt-4`} dangerouslySetInnerHTML={{ __html: p }} />
                       );
                     }
                     // "Jayapataka Swami" or any part after well-wisher
