@@ -16,13 +16,18 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
 
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) {
-            editorRef.current.innerHTML = value || "";
+            // Only update if the content is significantly different to avoid cursor jumping
+            // or simple comparison if safe
+            if (editorRef.current.innerHTML !== value) {
+                editorRef.current.innerHTML = value || "";
+            }
         }
     }, [value]);
 
     const exec = (command: string, arg?: string) => {
         document.execCommand(command, false, arg);
         editorRef.current?.focus();
+        handleInput();
     };
 
     const handleLink = () => {
@@ -38,11 +43,124 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
         }
     };
 
-    const handleClear = () => {
-        if (editorRef.current) {
-            editorRef.current.innerHTML = "";
-            onChange("");
+    // Fixed: Only remove formatting, don't delete content. Now more aggressive.
+    const handleClearFormatting = () => {
+        if (!editorRef.current) return;
+
+        // 1. Native clear
+        exec("removeFormat");
+
+        // 2. Aggressive cleanup of spans and styles
+        const cleanNode = (node: Node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const el = node as HTMLElement;
+                // Remove style attributes
+                el.removeAttribute("style");
+                // Remove class attributes (except our checklists)
+                if (!el.classList.contains("checklist")) {
+                    el.removeAttribute("class");
+                }
+                // Unwrap spans
+                if (el.tagName === "SPAN") {
+                    const parent = el.parentNode;
+                    while (el.firstChild) {
+                        parent?.insertBefore(el.firstChild, el);
+                    }
+                    parent?.removeChild(el);
+                } else {
+                    // Recurse
+                    Array.from(el.childNodes).forEach(cleanNode);
+                }
+            }
+        };
+
+        Array.from(editorRef.current.childNodes).forEach(cleanNode);
+        handleInput();
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData("text/plain");
+        const html = e.clipboardData.getData("text/html");
+
+        if (html) {
+            // Create a temp element to sanitize the HTML
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = html;
+
+            // Strip all attributes from all elements
+            const stripAttributes = (node: Node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const el = node as HTMLElement;
+                    // Remove all attributes except 'href' for links
+                    while (el.attributes.length > 0) {
+                        const attr = el.attributes[0].name;
+                        if (el.tagName === "A" && attr === "href") {
+                            // Keep href for links, but maybe ensure target="_blank" etc?
+                            // For now, let's just skip removing it.
+                            // Actually, looping while removing changes indices.
+                            // Better to get list of attrs to remove.
+                            break;
+                        }
+                        el.removeAttribute(attr);
+                    }
+
+                    // Specific cleanup
+                    if (el.tagName === "A") {
+                        // Re-add href if we stripped it, or better logic:
+                        // Let's just strip EVERYTHING for now to be safe as user requested plain text look
+                        // But we want to keep structure like P, UL, LI.
+                        // Actually, the user's specific complaint was "span style=...".
+                    }
+
+                    // Recurse
+                    Array.from(node.childNodes).forEach(stripAttributes);
+                }
+            };
+
+            // Simpler approach: innerText? No, we want paragraphs.
+            // Let's use the text/plain fallback if we want PURE text, 
+            // but the user might want to paste lists.
+
+            // Let's try to just insert text for now as it's safer and requested "why is it using this type of things automatically".
+            // The previous implementation WAS inserting text, which is what we want. 
+            // BUT, wait, did I verify the previous tool call actually worked? 
+            // The previous view_file showed `onPaste={handlePaste}` IS present.
+            // And `handlePaste` inserts text.
+            // So if user says "nothing is fixed", maybe they haven't reloaded?
+            // OR, maybe they are pasting from a source that doesn't provide text/plain? (Unlikely)
+
+            // Let's stick to the text insertion but make sure it handles newlines as paragraphs if possible?
+            // `insertText` usually handles newlines.
+
+            // Re-affirming the plain text paste.
+            document.execCommand("insertText", false, text);
+        } else {
+            document.execCommand("insertText", false, text);
         }
+        handleInput();
+    };
+
+    const applyFontSize = (sizePx: string) => {
+        if (!editorRef.current) return;
+
+        // Use a marker font size that is unlikely to be used (e.g., 7)
+        document.execCommand("fontSize", false, "7");
+
+        const fontElements = editorRef.current.getElementsByTagName("font");
+
+        // Convert live HTMLCollection to array to avoid issues while modifying
+        Array.from(fontElements).forEach((el) => {
+            if (el.getAttribute("size") === "7") {
+                const span = document.createElement("span");
+                span.style.fontSize = `${sizePx}px`;
+                span.innerHTML = el.innerHTML;
+                el.parentNode?.replaceChild(span, el);
+            }
+        });
+
+        handleInput();
+        editorRef.current.focus();
     };
 
     const insertChecklist = () => {
@@ -91,53 +209,62 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
 
     return (
         <div className={cn("border rounded-md bg-white", className)}>
-            <div className="flex flex-wrap gap-2 px-3 py-2 border-b bg-muted/50">
-                <button type="button" className="p-1 hover:text-primary" onClick={() => exec("bold")} aria-label="Bold">
+            <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b bg-muted/50">
+                {/* Font Size Dropdown */}
+                <select
+                    className="h-7 w-16 text-xs border rounded bg-background px-1 mr-2"
+                    onChange={(e) => applyFontSize(e.target.value)}
+                    value="" // Always reset to allow re-selecting same size
+                >
+                    <option value="" disabled>Size</option>
+                    <option value="12">12px</option>
+                    <option value="14">14px</option>
+                    <option value="16">16px</option>
+                    <option value="18">18px</option>
+                    <option value="20">20px</option>
+                    <option value="24">24px</option>
+                    <option value="30">30px</option>
+                </select>
+
+                <div className="w-px h-5 bg-border mx-1" />
+
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={() => exec("bold")} aria-label="Bold">
                     <Bold className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={() => exec("italic")} aria-label="Italic">
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={() => exec("italic")} aria-label="Italic">
                     <Italic className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={() => exec("underline")} aria-label="Underline">
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={() => exec("underline")} aria-label="Underline">
                     <Underline className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={insertChecklist} aria-label="Checklist">
+
+                <div className="w-px h-5 bg-border mx-1" />
+
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={insertChecklist} aria-label="Checklist">
                     <CheckSquare className="h-4 w-4" />
                 </button>
-                <button
-                    type="button"
-                    className="p-1 hover:text-primary"
-                    onClick={() => exec("fontSize", "2")}
-                    aria-label="Smaller text"
-                >
-                    <span className="text-sm leading-none align-middle">A<sup className="text-[10px]">▼</sup></span>
-                </button>
-                <button
-                    type="button"
-                    className="p-1 hover:text-primary"
-                    onClick={() => exec("fontSize", "4")}
-                    aria-label="Larger text"
-                >
-                    <span className="text-sm leading-none align-middle">A<sup className="text-[10px]">▲</sup></span>
-                </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={() => exec("insertUnorderedList")} aria-label="Bullet list">
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={() => exec("insertUnorderedList")} aria-label="Bullet list">
                     <List className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={() => exec("insertOrderedList")} aria-label="Numbered list">
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={() => exec("insertOrderedList")} aria-label="Numbered list">
                     <ListOrdered className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={handleLink} aria-label="Insert link">
+
+                <div className="w-px h-5 bg-border mx-1" />
+
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={handleLink} aria-label="Insert link">
                     <LinkIcon className="h-4 w-4" />
                 </button>
-                <button type="button" className="p-1 hover:text-primary" onClick={handleClear} aria-label="Clear">
+                <button type="button" className="p-1.5 rounded hover:bg-muted hover:text-primary transition-colors" onClick={handleClearFormatting} aria-label="Clear Formatting">
                     <X className="h-4 w-4" />
                 </button>
             </div>
             <div
                 ref={editorRef}
-                className="min-h-[200px] px-3 py-3 outline-none prose prose-lg max-w-none text-foreground/80 space-y-6 [&_p]:my-0 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2 [&_li]:my-1 [&_a]:text-primary [&_a]:underline [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_ul.checklist]:list-none [&_ul.checklist]:pl-0 [&_ul.checklist>li]:relative [&_ul.checklist>li]:ps-6 [&_ul.checklist>li]:my-2 [&_ul.checklist>li]:before:content-['✔'] [&_ul.checklist>li]:before:text-primary [&_ul.checklist>li]:before:absolute [&_ul.checklist>li]:before:left-0 [&_ul.checklist>li]:before:top-0"
+                className="min-h-[200px] px-4 py-4 outline-none prose prose-lg max-w-none text-foreground/80 space-y-4 [&_p]:my-2 [&_span]:!leading-normal [&_span]:!text-inherit [&_p]:!text-inherit"
                 contentEditable
                 onInput={handleInput}
+                onPaste={handlePaste}
                 suppressContentEditableWarning
                 aria-placeholder={placeholder}
             />

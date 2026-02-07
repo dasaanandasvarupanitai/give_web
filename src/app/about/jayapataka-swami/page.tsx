@@ -5,12 +5,6 @@ import { getAboutPage, type AboutPage } from "@/lib/services/firestore";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-const FALLBACK_HERO_TITLE = "His Holiness Jayapatākā Swami";
-const FALLBACK_GREETING = "My dear spiritual son Mani Gopal dasa,";
-const FALLBACK_BODY =
-  "Please accept my blessings. All glories to Srila Prabhupada. I am very glad to hear of your expansion into the teachings of these very important literatures. One thing I see is missing is the study of Srila Prabhupada's life and having some course on Srila Prabhupada as the founder-acarya of ISKCON. I think that would be something very important to have people recognize the great qualities of Srila Prabhupada and his contribution. Your idea of having Bhakti sastri for illiterate, so that they can hear the bhakti sastras and give oral exams, I think that is very important. We would like to establish that everybody understands Srila Prabhupada's books and teachings. I know this that some people after taking the courses they forget the subject matter because they don't use it. If you don't use it, you loose it. They should use the teachings that they have and give it in various ways to others. And this way their bhakti sastri and other sastra's knowledge will stick with them. Studying Srila Prabhupada's books is the shortcut to get Krsna-prema. Thank you very much. Hope this finds you and your good wife in good health and happy in Krsna consciousness.";
-const FALLBACK_CLOSING = "Your well-wisher always\nJayapataka Swami";
-
 export default function JayapatakaSwamiPage() {
   const [page, setPage] = useState<AboutPage | null>(null);
 
@@ -27,13 +21,15 @@ export default function JayapatakaSwamiPage() {
     };
   }, []);
 
-  const heroTitle = page?.heroTitle ?? FALLBACK_HERO_TITLE;
-  const section = page?.sections.find((s) => s.id === "jayapataka-letter");
-  const paragraphs = section?.paragraphs ?? [
-    FALLBACK_GREETING,
-    FALLBACK_BODY,
-    FALLBACK_CLOSING,
-  ];
+  const heroTitle = page?.heroTitle;
+  const sections = page?.sections ?? [];
+
+  const topSection = sections.find((s) => s.id === "jayapataka-letter"); // Corrected ID from user DB dump
+
+  const paragraphs = topSection?.paragraphs ?? [];
+  const greeting = paragraphs[0]; // First para is greeting
+  const bodyParas = paragraphs.slice(1, -1); // Middle paras are body
+  const closing = paragraphs[paragraphs.length - 1]; // Last para is closing
 
   return (
     <div className="bg-background text-foreground">
@@ -42,14 +38,101 @@ export default function JayapatakaSwamiPage() {
           <div className="md:col-span-3 prose prose-lg max-w-none text-foreground/80 space-y-6">
             <AnimatedSection direction="left">
               <div>
-                <h1 className="text-3xl md:text-4xl font-headline font-bold text-foreground mb-6">
+                <h1 className="text-3xl md:text-5xl font-headline font-bold text-foreground mb-8">
                   {heroTitle}
                 </h1>
-                <p className="mb-6">{paragraphs[0] ?? FALLBACK_GREETING}</p>
-                <p>{paragraphs[1] ?? FALLBACK_BODY}</p>
-                <p className="font-bold mt-6 whitespace-pre-line">
-                  {paragraphs[2] ?? FALLBACK_CLOSING}
-                </p>
+                {(() => {
+                  // Logic to handle single-block content (legacy data fix)
+                  let displayParagraphs = paragraphs;
+
+                  // If we have one giant blob, let's try to split it for better formatting
+                  if (displayParagraphs.length === 1) {
+                    let text = displayParagraphs[0];
+                    const chunks: string[] = [];
+
+                    // 1. My dear spiritual son...
+                    const part1Marker = "My dear spiritual son Mani Gopal dasa";
+                    if (text.includes(part1Marker)) {
+                      const split1 = text.split("Please accept my blessings");
+                      chunks.push(split1[0].trim()); // Line 1
+                      text = "Please accept my blessings" + (split1[1] || "");
+                    }
+
+                    // 2. Please accept my blessings...
+                    const part2Marker = "Please accept my blessings. All glories to Srila Prabhupada.";
+                    if (text.includes(part2Marker)) {
+                      const split2 = text.split("I am very glad to hear");
+                      chunks.push(split2[0].trim()); // Line 2
+                      text = "I am very glad to hear" + (split2[1] || "");
+                    }
+
+                    // 3. I am very glad...
+                    const part3Marker = "I am very glad to hear";
+                    if (text.startsWith(part3Marker)) {
+                      const split3 = text.split("Your idea of having Bhakti sastri");
+                      // Handle potential casing or leading space issue
+                      if (split3.length === 1) {
+                        // Try with leading space as seen in user request
+                        const split3b = text.split(" Your idea of having Bhakti sastri");
+                        if (split3b.length > 1) {
+                          chunks.push(split3b[0].trim());
+                          text = "Your idea of having Bhakti sastri" + (split3b[1] || "");
+                        } else {
+                          chunks.push(text);
+                          text = "";
+                        }
+                      } else {
+                        chunks.push(split3[0].trim());
+                        text = "Your idea of having Bhakti sastri" + (split3[1] || "");
+                      }
+                    }
+
+                    // 4. Your idea...
+                    if (text.startsWith("Your idea of having Bhakti sastri")) {
+                      const split4 = text.split("Studying Srila Prabhupada's books");
+                      chunks.push(split4[0].trim());
+                      text = "Studying Srila Prabhupada's books" + (split4[1] || "");
+                    }
+
+                    // 5. Studying...
+                    if (text.startsWith("Studying Srila Prabhupada's books")) {
+                      const split5 = text.split("Your well-wisher always");
+                      chunks.push(split5[0].trim());
+                      if (split5[1]) {
+                        // 6. Signature
+                        chunks.push("Your well-wisher always" + split5[1]);
+                      }
+                    }
+
+                    if (chunks.length > 0) {
+                      displayParagraphs = chunks;
+                    }
+                  }
+
+                  return displayParagraphs.map((p, idx) => {
+                    const isFirst = idx === 0;
+                    const isSecond = idx === 1;
+                    const isLast = idx === displayParagraphs.length - 1;
+
+                    // Increase base text size (REVERTED as per user request to use default)
+                    const baseClasses = "leading-relaxed";
+
+                    // Apply specific styles
+                    if (isFirst) {
+                      return <div key={idx} className={`${baseClasses} font-bold`} dangerouslySetInnerHTML={{ __html: p }} />;
+                    }
+                    if (isSecond) {
+                      return <div key={idx} className={`${baseClasses} italic mb-6`} dangerouslySetInnerHTML={{ __html: p }} />;
+                    }
+                    if (isLast && displayParagraphs.length > 2) {
+                      // Signature styling
+                      return (
+                        <div key={idx} className={`${baseClasses} font-bold mt-8 border-t pt-4 inline-block`} dangerouslySetInnerHTML={{ __html: p.replace("Jayapataka Swami", "<br/>Jayapataka Swami") }} />
+                      );
+                    }
+                    return <div key={idx} className={`${baseClasses} mb-4`} dangerouslySetInnerHTML={{ __html: p }} />;
+                  });
+                })()}
               </div>
             </AnimatedSection>
           </div>

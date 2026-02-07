@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { parseHtmlToParagraphs } from "@/lib/html-utils";
 import {
     AboutPage,
     AboutSection,
@@ -69,12 +70,22 @@ export function AboutPageManager() {
     ) => {
         if (!activeAboutPage) return;
 
+        // We don't parse immediately on every keystroke to avoid cursor jumping/re-rendering issues
+        // We just store the raw HTML blob in paragraphs[0] for the editor to use.
+        // The parsing happens on SAVE or we can do it here if we want to be "live".
+        // BUT, the goal is to store as array.
+        // Actually, for the editor to work seamlessly, it needs the full HTML string.
+        // So we keep using paragraphs[0] (or a joined string) for the editor,
+        // but when we SAVE, we split it.
+        // However, the `activeAboutPage` logic below effectively updates the state.
+        // If we split it here, `getSectionContent` needs to join it back.
+
         const nextSections: AboutSection[] = activeAboutPage.sections.map(
             (section) => {
                 if (section.id !== sectionId) return section;
                 return {
                     ...section,
-                    // Store a single HTML blob per section in paragraphs[0]
+                    // Temporarily store as joined string or just one item for the editor loop
                     paragraphs: [value],
                 };
             }
@@ -99,13 +110,66 @@ export function AboutPageManager() {
 
         try {
             setSavingAbout(true);
+
+            // Process sections to ensure paragraphs are split correctly
+            const processedSections = activeAboutPage.sections.map(section => {
+                // If we have a single paragraph that contains HTML, try to split it
+                // We assume if it's length 1, it might be a blob from the editor
+                if (section.paragraphs.length === 1) {
+                    return {
+                        ...section,
+                        paragraphs: parseHtmlToParagraphs(section.paragraphs[0])
+                    };
+                }
+                return section;
+            });
+
             await setAboutPage({
                 slug: activeAboutPage.slug,
                 name: activeAboutPage.name,
                 heroTitle: activeAboutPage.heroTitle,
                 heroSubtitle: activeAboutPage.heroSubtitle,
-                sections: activeAboutPage.sections,
+                sections: processedSections,
             });
+        } finally {
+            setSavingAbout(false);
+        }
+    };
+
+    const handleFixDatabase = async () => {
+        if (!confirm("This will scan all About pages and split HTML blobs into paragraph arrays. Continue?")) return;
+
+        try {
+            setSavingAbout(true);
+            const allPages = await getAllAboutPages();
+
+            for (const page of allPages) {
+                const updatedSections = page.sections.map(section => {
+                    // Join existing paragraphs first in case it's mixed, then re-parse
+                    const joined = section.paragraphs.join("");
+                    return {
+                        ...section,
+                        paragraphs: parseHtmlToParagraphs(joined)
+                    };
+                });
+
+                await setAboutPage({
+                    ...page,
+                    sections: updatedSections
+                });
+            }
+            alert("Database fixed successfully!");
+
+            // Refresh current view
+            const freshPages = await getAllAboutPages();
+            setAboutPages(freshPages);
+            if (selectedAboutSlug) {
+                const freshPage = freshPages.find(p => p.slug === selectedAboutSlug);
+                if (freshPage) setActiveAboutPage(freshPage);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error fixing database.");
         } finally {
             setSavingAbout(false);
         }
@@ -177,7 +241,15 @@ export function AboutPageManager() {
                                 </Card>
                             ))}
 
-                            <div className="flex justify-end">
+                            <div className="flex justify-between">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleFixDatabase}
+                                    disabled={savingAbout}
+                                >
+                                    Fix Database
+                                </Button>
                                 <Button
                                     type="button"
                                     onClick={handleSaveAbout}
