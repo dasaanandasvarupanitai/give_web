@@ -73,7 +73,7 @@ export default function GivePage() {
             style={{ textAlign: "justify" }}
           >
             {bioParas.map((p, idx) => (
-              <p key={idx}>{p}</p>
+              <p key={idx} dangerouslySetInnerHTML={{ __html: p }} />
             ))}
           </div>
         </AnimatedSection>
