@@ -36,6 +36,15 @@ export default function SrilaPrabhupadaPage() {
   const finalSection = page.sections.find((s) => s.id === "prabhupada-final");
   const finalParas = finalSection?.paragraphs ?? [];
 
+  // Debug logging
+  console.log("Srila Prabhupada Page Data:", {
+    sectionsCount: page.sections.length,
+    sectionIds: page.sections.map(s => s.id),
+    purposesSection: purposesSection,
+    purposesParas: purposesParas,
+  });
+
+
   return (
     <div className="bg-background text-foreground">
       <div className="container max-w-screen-2xl py-16 md:py-24">
