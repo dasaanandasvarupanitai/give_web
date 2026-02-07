@@ -109,10 +109,19 @@ export default function JayapatakaSwamiPage() {
                     }
                   }
 
+                  // Check if we have signature paragraphs (well-wisher + name)
+                  const hasWellWisher = displayParagraphs.some(p => p.toLowerCase().includes("your well-wisher"));
+                  const hasJayapatakaSwami = displayParagraphs.some(p => p.toLowerCase().includes("jayapataka swami"));
+                  const signatureStartIdx = hasWellWisher && hasJayapatakaSwami
+                    ? displayParagraphs.findIndex(p => p.toLowerCase().includes("your well-wisher"))
+                    : -1;
+
                   return displayParagraphs.map((p, idx) => {
                     const isFirst = idx === 0;
                     const isSecond = idx === 1;
                     const isLast = idx === displayParagraphs.length - 1;
+                    const isSignatureStart = signatureStartIdx !== -1 && idx === signatureStartIdx;
+                    const isSignaturePart = signatureStartIdx !== -1 && idx > signatureStartIdx;
 
                     // Increase base text size (REVERTED as per user request to use default)
                     const baseClasses = "leading-relaxed";
@@ -124,8 +133,20 @@ export default function JayapatakaSwamiPage() {
                     if (isSecond) {
                       return <div key={idx} className={`${baseClasses} italic mb-6`} dangerouslySetInnerHTML={{ __html: p }} />;
                     }
+                    // Signature section - "Your well-wisher always" starts the signature block with border
+                    if (isSignatureStart) {
+                      return (
+                        <div key={idx} className={`${baseClasses} font-bold mt-8 border-t pt-4`} dangerouslySetInnerHTML={{ __html: p }} />
+                      );
+                    }
+                    // "Jayapataka Swami" or any part after well-wisher
+                    if (isSignaturePart) {
+                      return (
+                        <div key={idx} className={`${baseClasses} font-bold`} dangerouslySetInnerHTML={{ __html: p }} />
+                      );
+                    }
+                    // Fallback for last paragraph if signature detection didn't work
                     if (isLast && displayParagraphs.length > 2) {
-                      // Signature styling
                       return (
                         <div key={idx} className={`${baseClasses} font-bold mt-8 border-t pt-4 inline-block`} dangerouslySetInnerHTML={{ __html: p.replace("Jayapataka Swami", "<br/>Jayapataka Swami") }} />
                       );
