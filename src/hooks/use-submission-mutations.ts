@@ -64,8 +64,16 @@ export function useSubmissionMutations({
 
             if (task.type === "dailyListening" && audioBlob) {
                 try {
-                    const fileName = `recording_${Date.now()}.webm`;
-                    const audioFile = new File([audioBlob], fileName, { type: audioBlob.type || "audio/webm" });
+                    // Determine extension based on mime type
+                    let extension = "webm";
+                    if (audioBlob.type.includes("mp4")) {
+                        extension = "mp4";
+                    } else if (audioBlob.type.includes("ogg")) {
+                        extension = "ogg";
+                    }
+
+                    const fileName = `recording_${Date.now()}.${extension}`;
+                    const audioFile = new File([audioBlob], fileName, { type: audioBlob.type || `audio/${extension}` });
                     const basePath = `submissions/${task.id}/${userId}`;
                     recordingUrl = await uploadFile(audioFile, `${basePath}/${fileName}`);
                 } catch (uploadError) {

@@ -81,6 +81,23 @@ export function AudioRecorder({
         onRecordingRemoved();
     };
 
+    const getSupportedMimeType = () => {
+        const types = [
+            "audio/mp4",
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/ogg;codecs=opus",
+            "audio/ogg"
+        ];
+
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        return ""; // Let browser choose default if none match
+    };
+
     const startRecording = async () => {
         try {
             setRecordingError(null);
@@ -96,50 +113,63 @@ export function AudioRecorder({
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaStreamRef.current = stream;
 
-            const mimeType =
-                typeof MediaRecorder !== "undefined" &&
-                    MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-                    ? "audio/webm;codecs=opus"
-                    : "audio/webm";
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : undefined;
 
-            const mediaRecorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorderRef.current = mediaRecorder;
+            try {
+                const mediaRecorder = new MediaRecorder(stream, options);
+                mediaRecorderRef.current = mediaRecorder;
 
-            const chunks: BlobPart[] = [];
+                const chunks: BlobPart[] = [];
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    chunks.push(event.data);
-                }
-            };
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        chunks.push(event.data);
+                    }
+                };
 
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: mimeType });
-                if (audioUrl) {
-                    URL.revokeObjectURL(audioUrl);
-                }
-                const url = URL.createObjectURL(blob);
-                setAudioBlob(blob);
-                setAudioUrl(url);
-                onRecordingComplete(blob);
-                onRecordingStateChange(false);
-                if (recordingTimerRef.current) {
-                    clearInterval(recordingTimerRef.current);
-                    recordingTimerRef.current = null;
-                }
-            };
+                mediaRecorder.onstop = () => {
+                    const type = mimeType || mediaRecorder.mimeType || "audio/webm";
+                    const blob = new Blob(chunks, { type });
+                    if (audioUrl) {
+                        URL.revokeObjectURL(audioUrl);
+                    }
+                    const url = URL.createObjectURL(blob);
+                    setAudioBlob(blob);
+                    setAudioUrl(url);
+                    onRecordingComplete(blob);
+                    onRecordingStateChange(false);
+                    if (recordingTimerRef.current) {
+                        clearInterval(recordingTimerRef.current);
+                        recordingTimerRef.current = null;
+                    }
+                };
 
-            mediaRecorder.start();
-            onRecordingStateChange(true);
-            recordingStartTimeRef.current = Date.now();
-            setRecordingDuration(0);
+                mediaRecorder.onerror = (event: any) => {
+                    console.error("MediaRecorder error:", event.error);
+                    setRecordingError("An error occurred during recording.");
+                    stopRecording();
+                };
 
-            recordingTimerRef.current = setInterval(() => {
-                if (recordingStartTimeRef.current) {
-                    const diff = Date.now() - recordingStartTimeRef.current;
-                    setRecordingDuration(Math.floor(diff / 1000));
-                }
-            }, 1000);
+                // Use 1000ms timeslices to ensure data is captured periodically
+                // This helps with stability and prevents data loss on some browsers
+                mediaRecorder.start(1000);
+                onRecordingStateChange(true);
+                recordingStartTimeRef.current = Date.now();
+                setRecordingDuration(0);
+
+                recordingTimerRef.current = setInterval(() => {
+                    if (recordingStartTimeRef.current) {
+                        const diff = Date.now() - recordingStartTimeRef.current;
+                        setRecordingDuration(Math.floor(diff / 1000));
+                    }
+                }, 1000);
+            } catch (err) {
+                console.error("Error creating MediaRecorder:", err);
+                setRecordingError("Failed to create media recorder. Your browser might not support this format.");
+                resetRecordingState();
+            }
+
         } catch (error) {
             console.error("Error starting audio recording:", error);
             setRecordingError(
