@@ -83,11 +83,11 @@ export function AudioRecorder({
 
     const getSupportedMimeType = () => {
         const types = [
-            "audio/mp4",
-            "audio/webm;codecs=opus",
-            "audio/webm",
-            "audio/ogg;codecs=opus",
-            "audio/ogg"
+            "audio/webm;codecs=opus", // Chrome/Firefox (High compression)
+            "audio/mp4",              // Safari (AAC - Good compression)
+            "audio/ogg;codecs=opus",  // Firefox
+            "audio/webm",             // Fallback
+            "audio/ogg"               // Fallback
         ];
 
         for (const type of types) {
@@ -110,11 +110,25 @@ export function AudioRecorder({
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
+            });
             mediaStreamRef.current = stream;
 
             const mimeType = getSupportedMimeType();
-            const options = mimeType ? { mimeType } : undefined;
+
+            // OPTIMIZATION: Reduce bitrate to 64kbps to save memory on mobile devices
+            // Default can be 128kbps or higher, which creates large Blobs (~1MB/min vs ~0.5MB/min)
+            const options: MediaRecorderOptions = {
+                audioBitsPerSecond: 64000,
+            };
+            if (mimeType) {
+                options.mimeType = mimeType;
+            }
 
             try {
                 const mediaRecorder = new MediaRecorder(stream, options);
@@ -184,6 +198,8 @@ export function AudioRecorder({
     const stopRecording = () => {
         try {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                // Request final blob before stopping to ensure we get everything
+                mediaRecorderRef.current.requestData();
                 mediaRecorderRef.current.stop();
             }
             if (mediaStreamRef.current) {
