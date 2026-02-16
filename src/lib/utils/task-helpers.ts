@@ -1,4 +1,5 @@
 import type { TaskType } from "@/lib/models/task";
+import { isTaskStarted } from "@/lib/utils";
 import {
   BookOpen,
   FileQuestion,
@@ -69,12 +70,9 @@ import type { Task } from "@/lib/models/task";
 export function getTaskDisplayStatus(task: Task): "scheduled" | "published" | "closed" {
   const now = new Date();
 
-  // Check if task is scheduled (startDate is in the future)
-  if (task.startDate) {
-    const startDate = new Date(task.startDate);
-    if (now < startDate) {
-      return "scheduled";
-    }
+  // Check if task is scheduled (startDate is in the future, using student's local timezone)
+  if (!isTaskStarted(task.startDate)) {
+    return "scheduled";
   }
 
   // For announcements, they're either scheduled or published (never closed)

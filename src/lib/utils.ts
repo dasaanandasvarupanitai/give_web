@@ -15,16 +15,16 @@ export function isWithinGracePeriod(submission: Submission | null): boolean {
   if (!submission || !submission.submittedAt) {
     return false;
   }
-  
+
   // Only allow grace period for "submitted" status, not "graded"
   if (submission.status !== "submitted") {
     return false;
   }
-  
+
   const submittedAt = submission.submittedAt.getTime();
   const now = new Date().getTime();
   const gracePeriodMs = 15 * 60 * 1000; // 15 minutes in milliseconds
-  
+
   return (now - submittedAt) <= gracePeriodMs;
 }
 
@@ -37,13 +37,13 @@ export function getGracePeriodRemainingMinutes(submission: Submission | null): n
   if (!isWithinGracePeriod(submission) || !submission?.submittedAt) {
     return 0;
   }
-  
+
   const submittedAt = submission.submittedAt.getTime();
   const now = new Date().getTime();
   const gracePeriodMs = 15 * 60 * 1000; // 15 minutes in milliseconds
   const elapsed = now - submittedAt;
   const remaining = gracePeriodMs - elapsed;
-  
+
   return Math.ceil(remaining / (60 * 1000)); // Convert to minutes
 }
 
@@ -58,10 +58,42 @@ function getLocalDeadline(dueDate: Date): Date {
   const year = dueDate.getFullYear();
   const month = dueDate.getMonth();
   const day = dueDate.getDate();
-  
+
   // Create deadline at 11:59:59 PM on that date in user's local timezone
   const deadline = new Date(year, month, day, 23, 59, 59, 999);
   return deadline;
+}
+
+/**
+ * Calculate the start time in user's local timezone (12:00:00 AM on start date)
+ * @param startDate - The task start date
+ * @returns Start time as 12:00:00 AM on the start date in user's local timezone
+ */
+function getLocalStartDate(startDate: Date): Date {
+  // Extract date components from the start date (year, month, day)
+  // This ensures we use the date part regardless of timezone
+  const year = startDate.getFullYear();
+  const month = startDate.getMonth();
+  const day = startDate.getDate();
+
+  // Create start time at 12:00:00 AM (midnight) on that date in user's local timezone
+  return new Date(year, month, day, 0, 0, 0, 0);
+}
+
+/**
+ * Check if a task has started based on user's local timezone
+ * @param startDate - The task start date
+ * @returns true if the task has started (current time >= midnight on start date in user's local timezone)
+ * 
+ * Uses per-user timezone: task becomes visible at 12:00:00 AM on start date in user's local timezone.
+ */
+export function isTaskStarted(startDate: Date | null | undefined): boolean {
+  if (!startDate) return true; // No start date means always visible
+
+  const now = new Date();
+  const localStart = getLocalStartDate(new Date(startDate));
+
+  return now >= localStart;
 }
 
 /**
@@ -75,16 +107,16 @@ function getLocalDeadline(dueDate: Date): Date {
  */
 export function isSubmissionWindowOpen(dueDate: Date | null | undefined): boolean {
   if (!dueDate) return true; // No due date means always open
-  
+
   const now = new Date();
   const localDeadline = getLocalDeadline(new Date(dueDate));
-  
+
   // Grace period disabled - submissions close exactly at due date (11:59:59 PM local time)
   // To re-enable 2-hour grace period, uncomment the following lines:
   // const gracePeriodMs = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
   // const submissionDeadline = new Date(localDeadline.getTime() + gracePeriodMs);
   // return now <= submissionDeadline;
-  
+
   // Current behavior: no grace period - close at 11:59:59 PM on due date in user's local timezone
   return now <= localDeadline;
 }
@@ -99,14 +131,14 @@ export function isSubmissionWindowOpen(dueDate: Date | null | undefined): boolea
  */
 export function getSubmissionDeadline(dueDate: Date | null | undefined): Date | null {
   if (!dueDate) return null;
-  
+
   const localDeadline = getLocalDeadline(new Date(dueDate));
-  
+
   // Grace period disabled - deadline is 11:59:59 PM on due date in user's local timezone
   // To re-enable 2-hour grace period, uncomment the following lines:
   // const gracePeriodMs = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
   // return new Date(localDeadline.getTime() + gracePeriodMs);
-  
+
   // Current behavior: no grace period - deadline is 11:59:59 PM on due date in user's local timezone
   return localDeadline;
 }
@@ -118,13 +150,13 @@ export function getSubmissionDeadline(dueDate: Date | null | undefined): Date | 
  */
 export function getSubmissionWindowRemainingMinutes(dueDate: Date | null | undefined): number | null {
   if (!dueDate) return null;
-  
+
   const deadline = getSubmissionDeadline(dueDate);
   if (!deadline) return null;
-  
+
   const now = new Date();
   if (now > deadline) return null; // Window is closed
-  
+
   const remainingMs = deadline.getTime() - now.getTime();
   return Math.ceil(remainingMs / (60 * 1000)); // Convert to minutes
 }
@@ -148,10 +180,10 @@ export function dateToBangladeshTime(
   // Bangladesh timezone is UTC+6
   // Create ISO string with Bangladesh timezone offset
   const [year, month, day] = dateString.split('-').map(Number);
-  
+
   // Format: YYYY-MM-DDTHH:mm:ss.sss+06:00
   const isoString = `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}.${millisecond.toString().padStart(3, '0')}+06:00`;
-  
+
   return new Date(isoString);
 }
 
@@ -165,12 +197,12 @@ export function dateFromBangladeshTime(date: Date): string {
   // Convert UTC time to Bangladesh time by adding 6 hours
   const bangladeshOffset = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
   const bangladeshTime = new Date(date.getTime() + bangladeshOffset);
-  
+
   // Get the date components in Bangladesh timezone
   const year = bangladeshTime.getUTCFullYear();
   const month = bangladeshTime.getUTCMonth() + 1; // getUTCMonth() returns 0-11
   const day = bangladeshTime.getUTCDate();
-  
+
   // Format as YYYY-MM-DD
   return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 }

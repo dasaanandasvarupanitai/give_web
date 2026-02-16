@@ -5,6 +5,7 @@ import {
     taskFromFirestore,
     taskToFirestore,
 } from "@/lib/models/task";
+import { isTaskStarted } from "@/lib/utils";
 import {
     TaskBookmark,
     TaskBookmarkFirestore,
@@ -113,13 +114,11 @@ export async function getTasksByBatch(
             where("batchId", "==", batchId)
         );
         const snapshot = await getDocs(q);
-        const now = new Date();
         const tasks = snapshot.docs
             .map((doc) => taskFromFirestore(doc.id, doc.data() as TaskFirestore))
             .filter((task) => {
                 if (includeFutureTasks) return true;
-                if (!task.startDate) return true;
-                return task.startDate.getTime() <= now.getTime();
+                return isTaskStarted(task.startDate);
             });
         tasks.sort((a, b) => {
             const aDate = a.startDate || a.createdAt;
@@ -143,13 +142,11 @@ export function subscribeTasksByBatch(
     );
 
     return onSnapshot(q, (snapshot) => {
-        const now = new Date();
         const tasks = snapshot.docs
             .map((doc) => taskFromFirestore(doc.id, doc.data() as TaskFirestore))
             .filter((task) => {
                 if (includeFutureTasks) return true;
-                if (!task.startDate) return true;
-                return task.startDate.getTime() <= now.getTime();
+                return isTaskStarted(task.startDate);
             });
         tasks.sort((a, b) => {
             const aDate = a.startDate || a.createdAt;
