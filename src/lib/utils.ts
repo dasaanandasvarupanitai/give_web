@@ -59,8 +59,9 @@ function getLocalDeadline(dueDate: Date): Date {
   const month = dueDate.getMonth();
   const day = dueDate.getDate();
 
-  // Create deadline at 11:59:59 PM on that date in user's local timezone
-  const deadline = new Date(year, month, day, 23, 59, 59, 999);
+  // Create deadline at 01:00:00 AM on the NEXT day in user's local timezone
+  // This gives students until 1 AM the following morning to submit
+  const deadline = new Date(year, month, day + 1, 1, 0, 0, 0);
   return deadline;
 }
 
@@ -81,8 +82,8 @@ function getLocalStartDate(startDate: Date): Date {
   const month = bangladeshTime.getUTCMonth();
   const day = bangladeshTime.getUTCDate();
 
-  // 3. Create start time at 12:00:00 AM (midnight) on that date in user's local timezone
-  return new Date(year, month, day, 0, 0, 0, 0);
+  // 3. Create start time at 01:00:00 AM on that date in user's local timezone
+  return new Date(year, month, day, 1, 0, 0, 0);
 }
 
 /**

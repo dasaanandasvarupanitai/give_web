@@ -37,9 +37,9 @@ export function getTaskDisplayStatus(task: Task): "published" | "closed" {
         let deadline: Date;
 
         if (task.allowLateSubmission && task.lateSubmissionDays > 0) {
-            deadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays, 23, 59, 59, 999);
+            deadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays + 1, 1, 0, 0, 0);
         } else {
-            deadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
+            deadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
         }
 
         if (new Date() > deadline) return "closed";
@@ -72,8 +72,8 @@ export function isLateSubmissionAllowed(task: Task): boolean {
     if (!task.allowLateSubmission || !task.dueDate || task.type === "announcement") return false;
     const now = new Date();
     const dueDate = new Date(task.dueDate);
-    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
-    const lateSubmissionDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays, 23, 59, 59, 999);
+    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
+    const lateSubmissionDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays + 1, 1, 0, 0, 0);
     return now > dueDateDeadline && now <= lateSubmissionDeadline;
 }
 
@@ -84,8 +84,8 @@ export function getRemainingLateSubmissionDays(task: Task): number | null {
     if (!task.allowLateSubmission || !task.dueDate || task.type === "announcement") return null;
     const now = new Date();
     const dueDate = new Date(task.dueDate);
-    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
-    const lateSubmissionDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays, 23, 59, 59, 999);
+    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
+    const lateSubmissionDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + task.lateSubmissionDays + 1, 1, 0, 0, 0);
 
     if (now > dueDateDeadline && now <= lateSubmissionDeadline) {
         const remainingMs = lateSubmissionDeadline.getTime() - now.getTime();

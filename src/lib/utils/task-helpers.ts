@@ -86,16 +86,16 @@ export function getTaskDisplayStatus(task: Task): "scheduled" | "published" | "c
     let deadline: Date;
 
     if (task.allowLateSubmission && task.lateSubmissionDays > 0) {
-      // Late submission allowed: deadline is dueDate + lateSubmissionDays (11:59:59 PM on last day)
+      // Late submission allowed: deadline is dueDate + lateSubmissionDays + 1 day at 1:00 AM
       deadline = new Date(dueDate);
-      deadline.setDate(deadline.getDate() + task.lateSubmissionDays);
-      deadline.setHours(23, 59, 59, 999);
+      deadline.setDate(deadline.getDate() + task.lateSubmissionDays + 1);
+      deadline.setHours(1, 0, 0, 0);
     } else {
-      // No late submission: deadline is exactly the due date (grace period disabled)
-      // To re-enable 2-hour grace period, uncomment the following lines:
-      // const gracePeriodMs = 2 * 60 * 60 * 1000; // 2 hours
-      // deadline = new Date(dueDate.getTime() + gracePeriodMs);
-      deadline = dueDate;
+      // No late submission: deadline is exactly the due date + 1 hour (1:00 AM next day)
+      // This matches the student-facing deadline logic
+      deadline = new Date(dueDate);
+      deadline.setDate(deadline.getDate() + 1);
+      deadline.setHours(1, 0, 0, 0);
     }
 
     if (now > deadline) {
