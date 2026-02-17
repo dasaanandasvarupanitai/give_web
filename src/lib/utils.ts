@@ -70,13 +70,18 @@ function getLocalDeadline(dueDate: Date): Date {
  * @returns Start time as 12:00:00 AM on the start date in user's local timezone
  */
 function getLocalStartDate(startDate: Date): Date {
-  // Extract date components from the start date (year, month, day)
-  // This ensures we use the date part regardless of timezone
-  const year = startDate.getFullYear();
-  const month = startDate.getMonth();
-  const day = startDate.getDate();
+  // 1. Shift UTC time to Bangladesh time (UTC+6) to get the "absolute" intended date
+  // This offsets the stored timestamp so .getUTC*() methods return Bangladesh components
+  const bangladeshOffset = 6 * 60 * 60 * 1000;
+  const bangladeshTime = new Date(startDate.getTime() + bangladeshOffset);
 
-  // Create start time at 12:00:00 AM (midnight) on that date in user's local timezone
+  // 2. Use UTC components of the shifted date (effectively Bangladesh local time)
+  // This gives us the "Feb 17" regardless of the user's browser timezone
+  const year = bangladeshTime.getUTCFullYear();
+  const month = bangladeshTime.getUTCMonth();
+  const day = bangladeshTime.getUTCDate();
+
+  // 3. Create start time at 12:00:00 AM (midnight) on that date in user's local timezone
   return new Date(year, month, day, 0, 0, 0, 0);
 }
 
