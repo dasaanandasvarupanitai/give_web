@@ -177,7 +177,7 @@ export default function TaskSubmissionPage() {
   const localDueDateDeadline = task.dueDate
     ? (() => {
       const dueDate = new Date(task.dueDate);
-      return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
+      return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
     })()
     : null;
 
@@ -202,28 +202,28 @@ export default function TaskSubmissionPage() {
     const lateSubmissionDeadline = new Date(
       dueDate.getFullYear(),
       dueDate.getMonth(),
-      dueDate.getDate() + task.lateSubmissionDays,
-      23,
-      59,
-      59,
-      999
+      dueDate.getDate() + task.lateSubmissionDays + 1,
+      1,
+      0,
+      0,
+      0
     );
-    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
+    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
     return now > dueDateDeadline && now <= lateSubmissionDeadline;
   };
 
   const getRemainingLateSubmissionDays = (): number | null => {
     if (!task.allowLateSubmission || !task.dueDate || task.type === "announcement") return null;
     const dueDate = new Date(task.dueDate);
-    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
+    const dueDateDeadline = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
     const lateSubmissionDeadline = new Date(
       dueDate.getFullYear(),
       dueDate.getMonth(),
-      dueDate.getDate() + task.lateSubmissionDays,
-      23,
-      59,
-      59,
-      999
+      dueDate.getDate() + task.lateSubmissionDays + 1,
+      1,
+      0,
+      0,
+      0
     );
     if (now > dueDateDeadline && now <= lateSubmissionDeadline) {
       const remainingMs = lateSubmissionDeadline.getTime() - now.getTime();

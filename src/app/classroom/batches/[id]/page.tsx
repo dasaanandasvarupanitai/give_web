@@ -204,7 +204,7 @@ export default function BatchTasksPage() {
               const localDueDateDeadline = task.dueDate
                 ? (() => {
                   const dueDate = new Date(task.dueDate);
-                  return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), 23, 59, 59, 999);
+                  return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
                 })()
                 : null;
               const dueDatePassed = localDueDateDeadline && task.type !== "announcement" && new Date() > localDueDateDeadline;
