@@ -49,10 +49,10 @@ export function useDailyListeningAnalytics(
                 (task) => task.type === "dailyListening"
             );
 
-            // Filter tasks by date range if specified (based on task creation date)
+            // Filter tasks by date range if specified (based on task start date)
             if (appliedDateRange.from || appliedDateRange.to) {
                 dailyListeningTasks = dailyListeningTasks.filter((task) => {
-                    const taskDate = new Date(task.createdAt);
+                    const taskDate = task.startDate ? new Date(task.startDate) : new Date(task.createdAt);
 
                     if (appliedDateRange.from) {
                         const fromDate = new Date(appliedDateRange.from);
