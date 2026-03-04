@@ -11,7 +11,7 @@ export default function GivePage() {
   useEffect(() => {
     let mounted = true; 
     (async () => {
-      const data = await getAboutPage("give");
+      const data = await getAboutPage("give"); 
       if (mounted && data) {
         setPage(data);
       }
