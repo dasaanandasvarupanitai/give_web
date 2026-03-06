@@ -81,7 +81,7 @@ export function TaskCard({ task, submissionCount }: TaskCardProps) {
                         >
                             <TaskIcon className="h-5 w-5" />
                         </div>
-                        <div className="flex-1 min-w-0 w-full">
+                        <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <p className="font-medium break-words">{task.title}</p>
                                 <Badge
