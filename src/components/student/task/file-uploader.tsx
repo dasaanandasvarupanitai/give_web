@@ -40,8 +40,8 @@ export function FileUploader({
         if (e.target.files) {
             const files = Array.from(e.target.files);
 
-            // Validate file sizes (max 100MB per file)
-            const maxSize = 100 * 1024 * 1024; // 100MB
+            // Validate file sizes (max 500MB per file)
+            const maxSize = 500 * 1024 * 1024; // 500MB
             const validFiles: File[] = [];
             const invalidFiles: string[] = [];
 
@@ -56,7 +56,7 @@ export function FileUploader({
             if (invalidFiles.length > 0) {
                 toast({
                     title: "File Size Error",
-                    description: `The following files exceed 100MB limit: ${invalidFiles.join(", ")}`,
+                    description: `The following files exceed 500MB limit: ${invalidFiles.join(", ")}`,
                     variant: "destructive",
                 });
             }
@@ -77,7 +77,7 @@ export function FileUploader({
             <CardHeader>
                 <CardTitle>File Upload</CardTitle>
                 <CardDescription>
-                    Upload files: PDF, documents, pictures, videos, or audio (Max 100MB per file)
+                    Upload files: PDF, documents, pictures, videos, or audio (Max 500MB per file)
                 </CardDescription>
             </CardHeader>
             <CardContent>
