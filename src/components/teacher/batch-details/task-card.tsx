@@ -42,8 +42,8 @@ export function TaskCard({ task, submissionCount }: TaskCardProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Check if current user is the teacher who created the task
-    const canEdit = user?.uid === task.teacherId;
+    // All users viewing this component (teachers) can edit tasks
+    const canEdit = true;
 
     // Calculate display status for teacher dashboard
     const displayStatus = getTaskDisplayStatus(task);
