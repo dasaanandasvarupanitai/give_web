@@ -45,8 +45,13 @@ export async function fetchBatchSubmissionsData(batchId: string) {
                 studentId: submission.studentId,
                 files: [],
                 textSubmissions: [],
+                isArchived: false,
             };
             taskFiles.studentSubmissions.push(studentSubmission);
+        }
+
+        if (submission.isArchived) {
+            studentSubmission.isArchived = true;
         }
 
         const submissionTime = submission.submittedAt || submission.createdAt;
@@ -101,9 +106,13 @@ export async function fetchBatchSubmissionsData(batchId: string) {
 
     // Remove empty submissions
     taskFilesMap.forEach((taskFiles) => {
-        taskFiles.studentSubmissions = taskFiles.studentSubmissions.filter(
-            (s) => s.files.length > 0 || s.textSubmissions.length > 0
-        );
+        taskFiles.studentSubmissions = taskFiles.studentSubmissions.filter((s) => {
+            // Check if this student has any actual submission records for this task
+            const submission = submissions.find(
+                (rawSub) => rawSub.taskId === taskFiles.task.id && rawSub.studentId === s.studentId
+            );
+            return s.files.length > 0 || s.textSubmissions.length > 0 || submission?.isArchived;
+        });
     });
 
     // Load student info

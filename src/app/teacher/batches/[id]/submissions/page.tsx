@@ -161,6 +161,7 @@ export default function BatchSubmissionsPage() {
           onDeleteText={handleDeleteTextClick}
           onDeleteSelected={handleDeleteSelectedClick}
           getSelectedFilesForTask={getSelectedFilesForTask}
+          onRefresh={refresh}
         />
       )}
 

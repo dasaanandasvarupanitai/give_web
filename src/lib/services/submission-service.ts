@@ -90,6 +90,8 @@ export async function updateSubmission(
         if (submission.feedback !== undefined) updates.feedback = submission.feedback;
         if (submission.gradedAt !== undefined)
             updates.gradedAt = Timestamp.fromDate(submission.gradedAt);
+        if (submission.isArchived !== undefined)
+            updates.isArchived = submission.isArchived;
 
         await updateDoc(submissionRef, updates);
     } catch (error) {

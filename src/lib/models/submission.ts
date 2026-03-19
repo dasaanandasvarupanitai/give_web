@@ -17,6 +17,7 @@ export interface Submission {
   grade?: number;
   feedback?: string;
   gradedAt?: Date;
+  isArchived?: boolean;
 }
 
 export interface SubmissionFirestore {
@@ -33,6 +34,7 @@ export interface SubmissionFirestore {
   grade?: number;
   feedback?: string;
   gradedAt?: Timestamp;
+  isArchived?: boolean;
 }
 
 export function submissionFromFirestore(
@@ -54,6 +56,7 @@ export function submissionFromFirestore(
     grade: data.grade,
     feedback: data.feedback,
     gradedAt: data.gradedAt?.toDate(),
+    isArchived: data.isArchived,
   };
 }
 
@@ -69,7 +72,7 @@ export function submissionToFirestore(
     updatedAt: Timestamp.fromDate(submission.updatedAt),
     fileUrls: submission.fileUrls,
   };
-  
+
   // Only include optional fields if they're defined
   if (submission.submittedAt !== undefined) {
     data.submittedAt = Timestamp.fromDate(submission.submittedAt);
@@ -89,6 +92,9 @@ export function submissionToFirestore(
   if (submission.gradedAt !== undefined) {
     data.gradedAt = Timestamp.fromDate(submission.gradedAt);
   }
-  
+  if (submission.isArchived !== undefined) {
+    data.isArchived = submission.isArchived;
+  }
+
   return data;
 }

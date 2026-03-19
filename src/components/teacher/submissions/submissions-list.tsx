@@ -18,9 +18,12 @@ import {
     getTaskTypeIcon,
     getTaskTypeLabel,
 } from "@/lib/utils/task-helpers";
-import { Trash2 } from "lucide-react";
+import { Trash2, Eraser } from "lucide-react";
 import { FileSubmissionCard } from "./file-submission-card";
 import { TextSubmissionCard } from "./text-submission-card";
+import { CleanupStorageDialog } from "./cleanup-storage-dialog";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 
 export interface StudentFile {
     submissionId: string;
@@ -47,6 +50,7 @@ export interface StudentSubmission {
     studentId: string;
     files: StudentFile[];
     textSubmissions: StudentTextSubmission[];
+    isArchived?: boolean;
 }
 
 export interface TaskFiles {
@@ -72,6 +76,7 @@ interface SubmissionsListProps {
     onDeleteText: (submissionId: string, studentId: string) => void;
     onDeleteSelected: () => void;
     getSelectedFilesForTask: (taskFiles: TaskFiles) => StudentFile[];
+    onRefresh: () => void;
 }
 
 export function SubmissionsList({
@@ -87,7 +92,12 @@ export function SubmissionsList({
     onDeleteText,
     onDeleteSelected,
     getSelectedFilesForTask,
+    onRefresh,
 }: SubmissionsListProps) {
+    const params = useParams();
+    const batchId = params.id as string;
+    const [cleanupType, setCleanupType] = useState<TaskType | null>(null);
+
     const handleDownload = (fileUrl: string, fileName: string) => {
         const link = document.createElement("a");
         link.href = fileUrl;
@@ -126,18 +136,43 @@ export function SubmissionsList({
                     value={type}
                     className="border rounded-lg px-0 mb-0 shadow-sm overflow-hidden"
                 >
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/30">
-                        <div className="flex items-center gap-2">
-                            <span className="font-semibold text-lg">
-                                {getTaskTypeLabel(type)}
-                            </span>
-                            <Badge variant="secondary" className="ml-2">
-                                {groupedTasks[type].length} task
-                                {groupedTasks[type].length !== 1 ? "s" : ""}
-                            </Badge>
-                        </div>
-                    </AccordionTrigger>
+                    <div className="flex items-center justify-between w-full bg-muted/30 pr-2 sm:pr-4">
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-lg">
+                                    {getTaskTypeLabel(type)}
+                                </span>
+                                <Badge variant="secondary" className="ml-2">
+                                    {groupedTasks[type].length} task
+                                    {groupedTasks[type].length !== 1 ? "s" : ""}
+                                </Badge>
+                            </div>
+                        </AccordionTrigger>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground hidden sm:flex z-10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setCleanupType(type);
+                            }}
+                        >
+                            <Eraser className="h-4 w-4 mr-2" />
+                            Cleanup Storage
+                        </Button>
+                    </div>
                     <AccordionContent className="p-4 bg-card">
+                        <div className="sm:hidden pb-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-destructive border-destructive"
+                                onClick={() => setCleanupType(type)}
+                            >
+                                <Eraser className="h-4 w-4 mr-2" />
+                                Cleanup Storage
+                            </Button>
+                        </div>
                         <Accordion type="multiple" className="w-full space-y-2">
                             {groupedTasks[type].map(({ task, studentSubmissions }) => {
                                 const TaskIcon = getTaskTypeIcon(task.type);
@@ -304,6 +339,14 @@ export function SubmissionsList({
                                                                                     ? "s"
                                                                                     : ""}
                                                                             </Badge>
+                                                                            {studentSub.isArchived && (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="bg-orange-50 text-orange-700 border-orange-200"
+                                                                                >
+                                                                                    Archived
+                                                                                </Badge>
+                                                                            )}
                                                                         </div>
                                                                     </AccordionTrigger>
                                                                     <AccordionContent>
@@ -358,6 +401,15 @@ export function SubmissionsList({
                     </AccordionContent>
                 </AccordionItem>
             ))}
+            {cleanupType && (
+                <CleanupStorageDialog
+                    open={!!cleanupType}
+                    onOpenChange={(open) => !open && setCleanupType(null)}
+                    batchId={batchId}
+                    taskType={cleanupType}
+                    onSuccess={onRefresh}
+                />
+            )}
         </Accordion>
     );
 }
