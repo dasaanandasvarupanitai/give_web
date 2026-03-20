@@ -8,6 +8,7 @@ import { storage } from "@/lib/firebase";
 import {
   deleteObject,
   getDownloadURL,
+  listAll,
   ref,
   uploadBytesResumable,
   UploadTaskSnapshot,
@@ -27,10 +28,10 @@ export async function uploadFile(
 ): Promise<string> {
   try {
     const storageRef = ref(storage, path);
-    
+
     // Create resumable upload task
     const uploadTask = uploadBytesResumable(storageRef, file);
-    
+
     // Return a promise that resolves when upload completes
     return new Promise((resolve, reject) => {
       uploadTask.on(
@@ -79,21 +80,21 @@ export async function uploadFiles(
       const timestamp = Date.now();
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       const filePath = `${basePath}/${timestamp}_${sanitizedFileName}`;
-      
+
       if (onProgress) {
         onProgress(index, 0);
       }
-      
+
       const url = await uploadFile(file, filePath, (progress) => {
         if (onProgress) {
           onProgress(index, progress);
         }
       });
-      
+
       if (onProgress) {
         onProgress(index, 100);
       }
-      
+
       return url;
     });
 
@@ -135,31 +136,64 @@ export async function deleteFileByUrl(url: string): Promise<boolean> {
     // Format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media&token={token}
     // Or: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}
     const urlObj = new URL(url);
-    
+
     // Handle both /o/ and /b/{bucket}/o/ patterns
     // Pattern matches: /o/path or /b/bucket-name/o/path
     const pathMatch = urlObj.pathname.match(/\/(?:o|b\/[^\/]+\/o)\/(.+?)(?:\?|$)/);
-    
+
     if (!pathMatch || !pathMatch[1]) {
       throw new Error(`Invalid Firebase Storage URL format: ${url}`);
     }
 
     // Decode the URL-encoded path
     const storagePath = decodeURIComponent(pathMatch[1]);
-    
+
     console.log(`Deleting file from storage path: ${storagePath} (from URL: ${url})`);
-    
+
     // Delete using the path
     return await deleteFile(storagePath);
   } catch (error: any) {
     // If file doesn't exist, treat it as already deleted (success)
-    if (error?.code === 'storage/object-not-found' || 
-        (error instanceof Error && error.message.includes('object-not-found'))) {
+    if (error?.code === 'storage/object-not-found' ||
+      (error instanceof Error && error.message.includes('object-not-found'))) {
       console.log(`File already deleted or doesn't exist: ${url}`);
       return false;
     }
     console.error("Error in deleteFileByUrl:", error);
     throw new Error(`Failed to delete file from URL: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Delete all files within a specific storage prefix (folder)
+ * Useful for cleaning up all files for a specific student/task, including orphaned ones.
+ * @param prefix - Storage prefix (e.g., "submissions/{taskId}/{studentId}")
+ * @returns Object containing the count of deleted files
+ */
+export async function deleteFilesByPrefix(prefix: string): Promise<{ deletedCount: number }> {
+  try {
+    const listRef = ref(storage, prefix);
+    const result = await listAll(listRef);
+
+    if (result.items.length === 0) {
+      console.log(`No files found in storage prefix: ${prefix}`);
+      return { deletedCount: 0 };
+    }
+
+    console.log(`Deleting ${result.items.length} files from storage prefix: ${prefix}`);
+
+    // Delete all files in parallel
+    const deletePromises = result.items.map((item) => deleteObject(item));
+    await Promise.all(deletePromises);
+
+    return { deletedCount: result.items.length };
+  } catch (error: any) {
+    // If prefix doesn't exist, treat it as success with 0 deleted
+    if (error?.code === 'storage/object-not-found') {
+      return { deletedCount: 0 };
+    }
+    console.error(`Error in deleteFilesByPrefix for ${prefix}:`, error);
+    throw new Error(`Failed to delete files in prefix ${prefix}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

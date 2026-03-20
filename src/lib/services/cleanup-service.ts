@@ -1,4 +1,4 @@
-import { deleteFileByUrl } from "./storage";
+import { deleteFilesByPrefix } from "./storage";
 import { getSubmissionsByBatch, updateSubmission, getTasksByBatch } from "./firestore";
 import { TaskType } from "../models/task";
 
@@ -68,23 +68,12 @@ export async function cleanupSubmissionsStorage({
             const chunk = matchingSubmissions.slice(i, i + CHUNK_SIZE);
             const chunkResults = await Promise.allSettled(
                 chunk.map(async (submission) => {
-                    const filesToDelete: string[] = [];
-
-                    if (submission.fileUrls && submission.fileUrls.length > 0) {
-                        filesToDelete.push(...submission.fileUrls);
-                    }
-                    if (submission.recordingUrl) {
-                        filesToDelete.push(submission.recordingUrl);
-                    }
-
-                    // Delete files from storage
-                    if (filesToDelete.length > 0) {
-                        await Promise.allSettled(
-                            filesToDelete.map((url) => deleteFileByUrl(url).catch((err) => {
-                                console.error(`Failed to delete file ${url}:`, err);
-                            }))
-                        );
-                    }
+                    // 1. Delete ALL files in the student's task folder (including orphaned ones)
+                    const storagePrefix = `submissions/${submission.taskId}/${submission.studentId}`;
+                    const { deletedCount: filesDeletedByPrefix } = await deleteFilesByPrefix(storagePrefix).catch((err) => {
+                        console.error(`Failed to deep clean storage at ${storagePrefix}:`, err);
+                        return { deletedCount: 0 }; // Return 0 if deletion fails to avoid breaking the flow
+                    });
 
                     // Update Firestore record
                     await updateSubmission(submission.id, {
@@ -94,7 +83,7 @@ export async function cleanupSubmissionsStorage({
                         isArchived: true,
                     });
 
-                    return filesToDelete.length;
+                    return filesDeletedByPrefix;
                 })
             );
 
