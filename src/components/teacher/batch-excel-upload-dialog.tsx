@@ -142,30 +142,16 @@ export function BatchExcelUploadDialog({
             const listeningTasks = existingTasks.filter(t => t.type === "dailyListening");
 
             let maxFsTime = 0;
-            let lastTitle = "";
 
             listeningTasks.forEach(t => {
                 if (t.startDate) {
                     const tTime = t.startDate.getTime();
-                    if (tTime > maxFsTime) {
-                        maxFsTime = tTime;
-                        lastTitle = t.title;
-                    }
+                    if (tTime > maxFsTime) maxFsTime = tTime;
                 }
             });
 
             setMaxScheduledDate(maxFsTime > 0 ? new Date(maxFsTime) : null);
             const fsDayMs = maxFsTime > 0 ? new Date(maxFsTime).setHours(0, 0, 0, 0) : 0;
-
-            // Extract last sequence number from title if it exists e.g., "Today's listening to Srila Prabhupada - 53 (04.04.26)"
-            let nextSeqNumber = 1;
-            if (lastTitle) {
-                // match something like "- 53" or "- 053"
-                const match = lastTitle.match(/-\s*(\d+)/);
-                if (match && match[1]) {
-                    nextSeqNumber = parseInt(match[1]) + 1;
-                }
-            }
 
             // 2. Read Sheet
             const sheet = wb.Sheets[sheetName];
@@ -203,17 +189,9 @@ export function BatchExcelUploadDialog({
                     const rowDateObj = new Date(rowDayMs);
                     const formattedDateSuffix = format(rowDateObj, "dd.MM.yy");
 
-                    let newTitle = "Today's listening to Srila Prabhupada";
-
-                    // Mimic format: "Today's listening to Srila Prabhupada - 54 (05.04.26)"
-                    if (lastTitle) {
-                        const parts = lastTitle.split(" - ");
-                        if (parts.length > 1) {
-                            newTitle = parts[0];
-                        }
-                    }
-
-                    const finalTitle = `${newTitle} - ${nextSeqNumber} (${formattedDateSuffix})`;
+                    // Use title directly from the Excel sheet + append the date suffix
+                    const excelTitle = row.title ? row.title.toString().trim() : "Today's listening to Srila Prabhupada";
+                    const finalTitle = `${excelTitle} (${formattedDateSuffix})`;
 
                     // Due date is end of the day
                     const dueDateObj = new Date(rowDayMs);
@@ -225,8 +203,6 @@ export function BatchExcelUploadDialog({
                         startDate: rowDateObj,
                         dueDate: dueDateObj
                     });
-
-                    nextSeqNumber++;
                 }
             }
 
