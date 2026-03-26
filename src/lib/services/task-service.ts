@@ -25,6 +25,7 @@ import {
     Timestamp,
     updateDoc,
     where,
+    writeBatch,
 } from "firebase/firestore";
 import { getSubmissionsByTask } from "./submission-service";
 
@@ -41,6 +42,25 @@ export async function createTask(task: Omit<Task, "id">): Promise<string> {
         return taskRef.id;
     } catch (error) {
         throw new Error(`Failed to create task: ${error}`);
+    }
+}
+
+export async function bulkCreateTasks(tasks: Omit<Task, "id">[]): Promise<void> {
+    try {
+        const batchWrite = writeBatch(db);
+
+        for (const task of tasks) {
+            const taskRef = doc(collection(db, "tasks"));
+            const taskData: TaskFirestore = taskToFirestore({
+                ...task,
+                id: taskRef.id,
+            });
+            batchWrite.set(taskRef, taskData);
+        }
+
+        await batchWrite.commit();
+    } catch (error) {
+        throw new Error(`Failed to bulk create tasks: ${error}`);
     }
 }
 

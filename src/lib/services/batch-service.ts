@@ -63,6 +63,7 @@ export async function updateBatch(id: string, batch: Partial<Batch>): Promise<vo
         if (batch.schedule !== undefined) updates.schedule = batch.schedule;
         if (batch.location !== undefined) updates.location = batch.location;
         if (batch.logoUrl !== undefined) updates.logoUrl = batch.logoUrl;
+        if (batch.dailyListeningSheetName !== undefined) updates.dailyListeningSheetName = batch.dailyListeningSheetName;
         if (batch.isActive !== undefined) updates.isActive = batch.isActive;
 
         await updateDoc(batchRef, updates);

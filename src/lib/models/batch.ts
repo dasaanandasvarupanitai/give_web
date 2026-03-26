@@ -16,6 +16,7 @@ export interface Batch {
   schedule?: string;
   location?: string;
   logoUrl?: string;
+  dailyListeningSheetName?: string;
 }
 
 export interface BatchFirestore {
@@ -33,6 +34,7 @@ export interface BatchFirestore {
   schedule?: string;
   location?: string;
   logoUrl?: string;
+  dailyListeningSheetName?: string;
 }
 
 export function batchFromFirestore(id: string, data: BatchFirestore): Batch {
@@ -52,6 +54,7 @@ export function batchFromFirestore(id: string, data: BatchFirestore): Batch {
     schedule: data.schedule,
     location: data.location,
     logoUrl: data.logoUrl,
+    dailyListeningSheetName: data.dailyListeningSheetName,
   };
 }
 
@@ -67,7 +70,7 @@ export function batchToFirestore(batch: Batch): BatchFirestore {
     isActive: batch.isActive,
     studentCount: batch.studentCount,
   };
-  
+
   // Only include optional fields if they're defined
   if (batch.startDate !== undefined) {
     data.startDate = Timestamp.fromDate(batch.startDate);
@@ -84,6 +87,9 @@ export function batchToFirestore(batch: Batch): BatchFirestore {
   if (batch.logoUrl !== undefined) {
     data.logoUrl = batch.logoUrl;
   }
-  
+  if (batch.dailyListeningSheetName !== undefined) {
+    data.dailyListeningSheetName = batch.dailyListeningSheetName;
+  }
+
   return data;
 }

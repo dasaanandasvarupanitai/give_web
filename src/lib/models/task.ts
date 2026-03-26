@@ -90,7 +90,7 @@ export function taskToFirestore(task: Task): TaskFirestore {
     lateSubmissionDays: task.lateSubmissionDays,
     submissionCount: task.submissionCount,
   };
-  
+
   // Only include optional fields if they're defined
   if (task.startDate !== undefined) {
     data.startDate = Timestamp.fromDate(task.startDate);
@@ -101,7 +101,7 @@ export function taskToFirestore(task: Task): TaskFirestore {
   if (task.instructions !== undefined) {
     data.instructions = task.instructions;
   }
-  
+
   return data;
 }
 
@@ -133,7 +133,7 @@ function parseTaskType(typeString: string | undefined): TaskType {
 
 export function isTaskOverdue(task: Task): boolean {
   if (!task.dueDate) return false;
-  return new Date().isAfter(task.dueDate);
+  return new Date() > task.dueDate;
 }
 
 export function isTaskDueSoon(task: Task): boolean {

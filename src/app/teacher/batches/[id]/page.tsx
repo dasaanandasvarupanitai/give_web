@@ -4,6 +4,7 @@ import { TaskCreation } from "@/components/teacher/task-creation";
 import { PendingEnrollmentCard } from "@/components/teacher/batch-details/pending-enrollment-card";
 import { StudentCard } from "@/components/teacher/batch-details/student-card";
 import { TaskCard } from "@/components/teacher/batch-details/task-card";
+import { BatchExcelUploadDialog } from "@/components/teacher/batch-excel-upload-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,6 +49,7 @@ export default function BatchDetailsPage() {
   const [submissionCounts, setSubmissionCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isExcelUploadOpen, setIsExcelUploadOpen] = useState(false);
 
   useEffect(() => {
     if (!batchId) return;
@@ -343,6 +345,15 @@ export default function BatchDetailsPage() {
                     <span className="sm:hidden">Analytics</span>
                   </Button>
                   <Button
+                    onClick={() => setIsExcelUploadOpen(true)}
+                    variant="outline"
+                    className="w-full sm:w-auto border border-orange-500"
+                  >
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Schedule from Excel</span>
+                    <span className="sm:hidden">Excel</span>
+                  </Button>
+                  <Button
                     onClick={() => router.push(`/teacher/batches/${batchId}/submissions`)}
                     variant="outline"
                     className="w-full sm:w-auto border border-orange-500"
@@ -372,6 +383,13 @@ export default function BatchDetailsPage() {
               )}
             </CardContent>
           </Card>
+          {batch && (
+            <BatchExcelUploadDialog
+              open={isExcelUploadOpen}
+              onOpenChange={setIsExcelUploadOpen}
+              batch={batch}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
