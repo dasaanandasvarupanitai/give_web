@@ -27,6 +27,7 @@ export interface Task {
   lateSubmissionDays: number;
   instructions?: string;
   submissionCount: number;
+  isPinned: boolean;
 }
 
 export interface TaskFirestore {
@@ -47,6 +48,7 @@ export interface TaskFirestore {
   lateSubmissionDays: number;
   instructions?: string;
   submissionCount: number;
+  isPinned?: boolean;
 }
 
 export function taskFromFirestore(id: string, data: TaskFirestore): Task {
@@ -70,6 +72,7 @@ export function taskFromFirestore(id: string, data: TaskFirestore): Task {
     lateSubmissionDays: data.lateSubmissionDays ?? 3,
     instructions: data.instructions,
     submissionCount: data.submissionCount ?? 0,
+    isPinned: data.isPinned ?? false,
   };
 }
 
@@ -89,6 +92,7 @@ export function taskToFirestore(task: Task): TaskFirestore {
     allowLateSubmission: task.allowLateSubmission,
     lateSubmissionDays: task.lateSubmissionDays,
     submissionCount: task.submissionCount,
+    isPinned: task.isPinned,
   };
 
   // Only include optional fields if they're defined

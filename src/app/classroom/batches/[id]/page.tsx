@@ -35,6 +35,7 @@ import {
   Bookmark,
   Calendar,
   Loader2,
+  Pin,
   RefreshCw,
   Star,
 } from "lucide-react";
@@ -185,161 +186,195 @@ export default function BatchTasksPage() {
               </p>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredTasks.map((task) => {
-              const submissionStatus = getSubmissionStatus(task, submissions);
-              const displayStatus = getTaskDisplayStatus(task);
-              const TaskIcon = getTaskTypeIcon(task.type);
-              const taskColor = getTaskTypeColor(task.type);
-              const isOverdue = isTaskOverdue(task);
-              const isDueSoon = isTaskDueSoon(task);
-              const submission = submissions.get(task.id);
-              const isSubmitted = submission?.status === "submitted" || submission?.status === "graded";
-              const withinGracePeriod = submission ? isWithinGracePeriod(submission) : false;
-              const gracePeriodRemaining = gracePeriodCountdowns.get(task.id) || 0;
-              const lateSubmissionAllowed = isLateSubmissionAllowed(task);
-              const remainingLateDays = getRemainingLateSubmissionDays(task);
+        ) : (() => {
+          const pinnedTasks = filteredTasks.filter((t) => t.isPinned);
+          const otherTasks = filteredTasks.filter((t) => !t.isPinned);
 
-              const localDueDateDeadline = task.dueDate
-                ? (() => {
-                  const dueDate = new Date(task.dueDate);
-                  return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
-                })()
-                : null;
-              const dueDatePassed = localDueDateDeadline && task.type !== "announcement" && new Date() > localDueDateDeadline;
-              const submissionWindowOpen = task.dueDate && task.type !== "announcement"
-                ? new Date() <= new Date(localDueDateDeadline!.getTime())
-                : true;
+          const renderTaskCard = (task: typeof filteredTasks[0]) => {
+            const submissionStatus = getSubmissionStatus(task, submissions);
+            const displayStatus = getTaskDisplayStatus(task);
+            const TaskIcon = getTaskTypeIcon(task.type);
+            const taskColor = getTaskTypeColor(task.type);
+            const isOverdue = isTaskOverdue(task);
+            const isDueSoon = isTaskDueSoon(task);
+            const submission = submissions.get(task.id);
+            const isSubmitted = submission?.status === "submitted" || submission?.status === "graded";
+            const withinGracePeriod = submission ? isWithinGracePeriod(submission) : false;
+            const gracePeriodRemaining = gracePeriodCountdowns.get(task.id) || 0;
+            const lateSubmissionAllowed = isLateSubmissionAllowed(task);
+            const remainingLateDays = getRemainingLateSubmissionDays(task);
 
-              const clickable = isTaskClickable(task, submission, lateSubmissionAllowed);
+            const localDueDateDeadline = task.dueDate
+              ? (() => {
+                const dueDate = new Date(task.dueDate);
+                return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 1, 1, 0, 0, 0);
+              })()
+              : null;
+            const dueDatePassed = localDueDateDeadline && task.type !== "announcement" && new Date() > localDueDateDeadline;
+            const submissionWindowOpen = task.dueDate && task.type !== "announcement"
+              ? new Date() <= new Date(localDueDateDeadline!.getTime())
+              : true;
 
-              return (
-                <Card
-                  key={task.id}
-                  className={`transition-colors ${clickable ? "cursor-pointer hover:bg-accent" : ""} ${task.type === "announcement" || isSubmitted ? "opacity-75" : ""}`}
-                  onClick={() => {
-                    if (clickable) {
-                      router.push(`/classroom/tasks/${task.id}`);
-                    }
-                  }}
-                >
-                  <CardHeader>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="p-2 rounded-lg" style={{ backgroundColor: `${taskColor}20`, color: taskColor }}>
-                          <TaskIcon className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">{task.title}</CardTitle>
-                          <CardDescription className="mt-1 line-clamp-2">
-                            <LinkifiedText text={task.description} />
-                          </CardDescription>
-                        </div>
+            const clickable = isTaskClickable(task, submission, lateSubmissionAllowed);
+
+            return (
+              <Card
+                key={task.id}
+                className={`transition-colors ${clickable ? "cursor-pointer hover:bg-accent" : ""} ${task.type === "announcement" || isSubmitted ? "opacity-75" : ""}`}
+                onClick={() => {
+                  if (clickable) {
+                    router.push(`/classroom/tasks/${task.id}`);
+                  }
+                }}
+              >
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: `${taskColor}20`, color: taskColor }}>
+                        <TaskIcon className="h-5 w-5" />
                       </div>
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-accent z-10 relative"
-                          onClick={(e) => handleToggleBookmark(task, e)}
-                          title={isTaskBookmarked(task.id) ? "Remove bookmark" : "Bookmark assessment"}
-                        >
-                          <Bookmark
-                            className={`h-4 w-4 ${isTaskBookmarked(task.id) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`}
-                          />
-                        </Button>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{task.title}</CardTitle>
+                        <CardDescription className="mt-1 line-clamp-2">
+                          <LinkifiedText text={task.description} />
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-accent z-10 relative"
+                        onClick={(e) => handleToggleBookmark(task, e)}
+                        title={isTaskBookmarked(task.id) ? "Remove bookmark" : "Bookmark assessment"}
+                      >
+                        <Bookmark
+                          className={`h-4 w-4 ${isTaskBookmarked(task.id) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`}
+                        />
+                      </Button>
+                      <Badge
+                        variant="outline"
+                        className={
+                          submissionStatus.color === "gray"
+                            ? "bg-gray-50 text-gray-700 border-gray-200"
+                            : submissionStatus.color === "orange"
+                              ? "bg-orange-50 text-orange-700 border-orange-200"
+                              : "bg-blue-50 text-blue-700 border-blue-200"
+                        }
+                      >
+                        {submissionStatus.label}
+                      </Badge>
+                      {getTaskStatusBadge(displayStatus)}
+                    </div>
+                  </div>
+                </CardHeader>
+                {task.type !== "announcement" && (
+                  <CardContent>
+                    {withinGracePeriod && submission?.status === "submitted" && (
+                      <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <p className="text-sm font-semibold text-orange-900">Grace Period Active</p>
+                        <p className="text-xs text-orange-700 mt-1">
+                          You can edit or delete your submission. {gracePeriodRemaining} minute
+                          {gracePeriodRemaining !== 1 ? "s" : ""} remaining.
+                        </p>
+                      </div>
+                    )}
+                    {dueDatePassed && submissionWindowOpen && !isSubmitted && !lateSubmissionAllowed && (
+                      <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-900">Grace Period</p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          The submission window has closed.
+                          {(() => {
+                            const remaining = submissionWindowCountdowns.get(task.id);
+                            if (remaining !== null && remaining !== undefined && remaining > 0) {
+                              const hours = Math.floor(remaining / 60);
+                              const minutes = remaining % 60;
+                              return (
+                                <span className="block mt-1 font-semibold">
+                                  Time remaining:{" "}
+                                  {hours > 0
+                                    ? `${hours} hour${hours !== 1 ? "s" : ""} ${minutes} minute${minutes !== 1 ? "s" : ""}`
+                                    : `${minutes} minute${minutes !== 1 ? "s" : ""}`}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {task.dueDate && (
                         <Badge
                           variant="outline"
                           className={
-                            submissionStatus.color === "gray"
-                              ? "bg-gray-50 text-gray-700 border-gray-200"
-                              : submissionStatus.color === "orange"
+                            isOverdue
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : isDueSoon
                                 ? "bg-orange-50 text-orange-700 border-orange-200"
-                                : "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-gray-50 text-gray-700 border-gray-200"
                           }
                         >
-                          {submissionStatus.label}
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Due: {new Date(task.dueDate).toLocaleDateString()}
+                          {isOverdue && " (Overdue)"}
+                          {isDueSoon && !isOverdue && " (Due Soon)"}
                         </Badge>
-                        {getTaskStatusBadge(displayStatus)}
-                      </div>
+                      )}
+                      {lateSubmissionAllowed && remainingLateDays !== null && (
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Late Submission: {remainingLateDays} day{remainingLateDays !== 1 ? "s" : ""} remaining
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Star className="h-3 w-3 mr-1" />
+                        {task.maxPoints} points
+                      </Badge>
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                        {getTaskTypeLabel(task.type)}
+                      </Badge>
                     </div>
-                  </CardHeader>
-                  {task.type !== "announcement" && (
-                    <CardContent>
-                      {withinGracePeriod && submission?.status === "submitted" && (
-                        <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                          <p className="text-sm font-semibold text-orange-900">Grace Period Active</p>
-                          <p className="text-xs text-orange-700 mt-1">
-                            You can edit or delete your submission. {gracePeriodRemaining} minute
-                            {gracePeriodRemaining !== 1 ? "s" : ""} remaining.
-                          </p>
-                        </div>
-                      )}
-                      {dueDatePassed && submissionWindowOpen && !isSubmitted && !lateSubmissionAllowed && (
-                        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <p className="text-sm font-semibold text-yellow-900">Grace Period</p>
-                          <p className="text-xs text-yellow-700 mt-1">
-                            The submission window has closed.
-                            {(() => {
-                              const remaining = submissionWindowCountdowns.get(task.id);
-                              if (remaining !== null && remaining !== undefined && remaining > 0) {
-                                const hours = Math.floor(remaining / 60);
-                                const minutes = remaining % 60;
-                                return (
-                                  <span className="block mt-1 font-semibold">
-                                    Time remaining:{" "}
-                                    {hours > 0
-                                      ? `${hours} hour${hours !== 1 ? "s" : ""} ${minutes} minute${minutes !== 1 ? "s" : ""}`
-                                      : `${minutes} minute${minutes !== 1 ? "s" : ""}`}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        {task.dueDate && (
-                          <Badge
-                            variant="outline"
-                            className={
-                              isOverdue
-                                ? "bg-red-50 text-red-700 border-red-200"
-                                : isDueSoon
-                                  ? "bg-orange-50 text-orange-700 border-orange-200"
-                                  : "bg-gray-50 text-gray-700 border-gray-200"
-                            }
-                          >
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
-                            {isOverdue && " (Overdue)"}
-                            {isDueSoon && !isOverdue && " (Due Soon)"}
-                          </Badge>
-                        )}
-                        {lateSubmissionAllowed && remainingLateDays !== null && (
-                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Late Submission: {remainingLateDays} day{remainingLateDays !== 1 ? "s" : ""} remaining
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          <Star className="h-3 w-3 mr-1" />
-                          {task.maxPoints} points
-                        </Badge>
-                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                          {getTaskTypeLabel(task.type)}
-                        </Badge>
-                      </div>
-                    </CardContent>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          };
+
+          return (
+            <div className="space-y-6">
+              {pinnedTasks.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Pin className="h-4 w-4 text-yellow-600" />
+                    <h3 className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">
+                      Pinned ({pinnedTasks.length})
+                    </h3>
+                  </div>
+                  <div className="grid gap-4 border-l-2 border-yellow-300 pl-4">
+                    {pinnedTasks.map(renderTaskCard)}
+                  </div>
+                </div>
+              )}
+
+              {otherTasks.length > 0 && (
+                <div>
+                  {pinnedTasks.length > 0 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Other Assessments ({otherTasks.length})
+                      </h3>
+                    </div>
                   )}
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                  <div className="grid gap-4">
+                    {otherTasks.map(renderTaskCard)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

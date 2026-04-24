@@ -19,13 +19,13 @@ import { LinkifiedText } from "@/components/ui/linkified-text";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import type { Task } from "@/lib/models/task";
-import { deleteTask } from "@/lib/services/firestore";
+import { deleteTask, updateTask } from "@/lib/services/firestore";
 import {
     getTaskDisplayStatus,
     getTaskTypeColor,
     getTaskTypeIcon,
 } from "@/lib/utils/task-helpers";
-import { Edit, Loader2, Trash2 } from "lucide-react";
+import { Edit, Loader2, Pin, PinOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface TaskCardProps {
@@ -41,12 +41,32 @@ export function TaskCard({ task, submissionCount }: TaskCardProps) {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isPinning, setIsPinning] = useState(false);
 
     // All users viewing this component (teachers) can edit tasks
     const canEdit = true;
 
     // Calculate display status for teacher dashboard
     const displayStatus = getTaskDisplayStatus(task);
+
+    const handleTogglePin = async () => {
+        setIsPinning(true);
+        try {
+            await updateTask(task.id, { isPinned: !task.isPinned });
+            toast({
+                title: task.isPinned ? "Task unpinned" : "Task pinned",
+                description: task.isPinned ? "Task removed from top" : "Task will appear at top of list",
+            });
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: error instanceof Error ? error.message : "Failed to update task",
+                variant: "destructive",
+            });
+        } finally {
+            setIsPinning(false);
+        }
+    };
 
     const handleDelete = async () => {
         if (!canEdit) return;
@@ -84,6 +104,12 @@ export function TaskCard({ task, submissionCount }: TaskCardProps) {
                         <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <p className="font-medium break-words">{task.title}</p>
+                                {task.isPinned && (
+                                    <Badge variant="outline" className="flex-shrink-0 bg-yellow-50 text-yellow-700 border-yellow-300">
+                                        <Pin className="h-3 w-3 mr-1" />
+                                        Pinned
+                                    </Badge>
+                                )}
                                 <Badge
                                     variant="outline"
                                     className={`flex-shrink-0 ${displayStatus === "scheduled"
@@ -111,6 +137,23 @@ export function TaskCard({ task, submissionCount }: TaskCardProps) {
                         </div>
                         {canEdit && (
                             <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleTogglePin}
+                                    disabled={isPinning}
+                                    className={`h-8 px-3 sm:px-2 sm:h-8 flex-1 sm:flex-initial border ${task.isPinned ? "border-yellow-500 text-yellow-700 hover:text-yellow-800" : "border-orange-500 sm:border-border"}`}
+                                    title={task.isPinned ? "Unpin task" : "Pin task to top"}
+                                >
+                                    {isPinning ? (
+                                        <Loader2 className="h-4 w-4 animate-spin sm:mr-0 mr-2" />
+                                    ) : task.isPinned ? (
+                                        <PinOff className="h-4 w-4 sm:mr-0 mr-2" />
+                                    ) : (
+                                        <Pin className="h-4 w-4 sm:mr-0 mr-2" />
+                                    )}
+                                    <span className="sm:hidden">{task.isPinned ? "Unpin" : "Pin"}</span>
+                                </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"

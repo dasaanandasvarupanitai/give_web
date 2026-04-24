@@ -87,6 +87,8 @@ export async function updateTask(id: string, task: Partial<Task>): Promise<void>
         if (task.instructions !== undefined) updates.instructions = task.instructions;
         if (task.submissionCount !== undefined)
             updates.submissionCount = task.submissionCount;
+        if (task.isPinned !== undefined)
+            updates.isPinned = task.isPinned;
 
         await updateDoc(taskRef, updates);
     } catch (error) {
@@ -141,6 +143,7 @@ export async function getTasksByBatch(
                 return isTaskStarted(task.startDate);
             });
         tasks.sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             const aDate = a.startDate || a.createdAt;
             const bDate = b.startDate || b.createdAt;
             return bDate.getTime() - aDate.getTime();
@@ -169,6 +172,7 @@ export function subscribeTasksByBatch(
                 return isTaskStarted(task.startDate);
             });
         tasks.sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             const aDate = a.startDate || a.createdAt;
             const bDate = b.startDate || b.createdAt;
             return bDate.getTime() - aDate.getTime();
