@@ -142,9 +142,18 @@ export function AudioRecorder({
                     }
                 };
 
-                mediaRecorder.onstop = () => {
+                mediaRecorder.onstop = async () => {
                     const type = mimeType || mediaRecorder.mimeType || "audio/webm";
-                    const blob = new Blob(chunks, { type });
+                    let blob = new Blob(chunks, { type });
+
+                    // WebM files from MediaRecorder lack duration/Cues metadata, causing browsers
+                    // to truncate playback after the initial buffer. Fix by injecting duration.
+                    if (type.includes("webm") && recordingStartTimeRef.current) {
+                        const duration = Date.now() - recordingStartTimeRef.current;
+                        const { default: fixWebmDuration } = await import("fix-webm-duration");
+                        blob = await fixWebmDuration(blob, duration, { logger: false });
+                    }
+
                     if (audioUrl) {
                         URL.revokeObjectURL(audioUrl);
                     }
