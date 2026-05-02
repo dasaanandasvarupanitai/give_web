@@ -19,13 +19,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { Batch } from "@/lib/models/batch";
-import type { Task } from "@/lib/models/task";
 import { updateBatch } from "@/lib/services/batch-service";
-import { bulkCreateTasks, getTasksByBatch } from "@/lib/services/task-service";
+import { createTask, getTasksByBatch } from "@/lib/services/task-service";
 import { CalendarClock, Loader2, Link2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 
 interface BatchExcelUploadDialogProps {
@@ -50,6 +50,7 @@ export function BatchExcelUploadDialog({
 }: BatchExcelUploadDialogProps) {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState(0);
     const [initing, setIniting] = useState(true);
 
     // Excel State
@@ -217,31 +218,35 @@ export function BatchExcelUploadDialog({
     const handleBulkSchedule = async () => {
         if (newTasks.length === 0) return;
         setLoading(true);
+        setProgress(0);
         try {
-            const tasksToCreate: Omit<Task, "id">[] = newTasks.map((t) => ({
-                title: t.title,
-                description: t.url, // Description only URL as requested
-                batchId: batch.id,
-                teacherId: batch.teacherId, // Note: assuming teacher executing this leads to batch.teacherId context
-                type: "dailyListening",
-                status: "published",
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                startDate: t.startDate,
-                dueDate: t.dueDate,
-                maxPoints: 100, // default or 0? 100 is standard
-                attachments: [t.url],
-                allowedFileTypes: ["pdf", "doc", "docx", "jpg", "jpeg", "png"],
-                allowLateSubmission: false,
-                lateSubmissionDays: 0,
-                submissionCount: 0,
-            }));
-
-            await bulkCreateTasks(tasksToCreate);
+            for (let i = 0; i < newTasks.length; i++) {
+                const t = newTasks[i];
+                await createTask({
+                    title: t.title,
+                    description: t.url,
+                    batchId: batch.id,
+                    teacherId: batch.teacherId,
+                    type: "dailyListening",
+                    status: "published",
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    startDate: t.startDate,
+                    dueDate: t.dueDate,
+                    maxPoints: 100,
+                    attachments: [t.url],
+                    allowedFileTypes: ["pdf", "doc", "docx", "jpg", "jpeg", "png"],
+                    allowLateSubmission: false,
+                    lateSubmissionDays: 0,
+                    submissionCount: 0,
+                    isPinned: false,
+                });
+                setProgress(Math.round(((i + 1) / newTasks.length) * 100));
+            }
 
             toast({
                 title: "Success",
-                description: `Successfully scheduled ${tasksToCreate.length} new tasks!`,
+                description: `Successfully scheduled ${newTasks.length} new tasks!`,
             });
 
             onSuccess?.();
@@ -254,6 +259,7 @@ export function BatchExcelUploadDialog({
             });
         } finally {
             setLoading(false);
+            setProgress(0);
         }
     };
 
@@ -349,6 +355,16 @@ export function BatchExcelUploadDialog({
                         </div>
                     )}
                 </div>
+
+                {loading && progress > 0 && (
+                    <div className="px-1 pb-2 space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Scheduling tasks...</span>
+                            <span>{progress}%</span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                    </div>
+                )}
 
                 <DialogFooter className="sm:justify-between items-center mt-4 border-t pt-4">
                     <Button
