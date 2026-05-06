@@ -131,6 +131,7 @@ export function FileUploader({
                         {selectedFiles.map((file, index) => {
                             const progress = uploadProgress.get(index);
                             const isUploadingFile = isUploading && progress !== undefined && progress < 100;
+                            const isFinalizing = isUploading && progress === 100;
 
                             return (
                                 <div
@@ -154,6 +155,16 @@ export function FileUploader({
                                                     </div>
                                                     <span className="text-xs text-muted-foreground mt-1 block">
                                                         Uploading... {Math.round(progress)}%
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {isFinalizing && (
+                                                <div className="mt-2">
+                                                    <div className="w-full bg-secondary rounded-full h-1.5">
+                                                        <div className="bg-primary h-1.5 rounded-full animate-pulse w-full" />
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground mt-1 block">
+                                                        Finalizing upload...
                                                     </span>
                                                 </div>
                                             )}
