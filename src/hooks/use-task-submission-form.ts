@@ -88,10 +88,10 @@ export function useTaskSubmissionForm({
                     return;
                 }
             } else {
-                if (selectedFiles.length === 0 && !notes.trim()) {
+                if (selectedFiles.length === 0) {
                     toast({
                         title: "Validation Error",
-                        description: "Please add at least one submission (file or notes)",
+                        description: "Please upload at least one file before submitting.",
                         variant: "destructive",
                     });
                     return;

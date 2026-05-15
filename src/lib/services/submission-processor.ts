@@ -77,7 +77,7 @@ export async function fetchBatchSubmissionsData(batchId: string) {
             });
         }
 
-        if (isDailyListening && submission.recordingUrl) {
+        if (submission.recordingUrl) {
             const fileName = getFileNameFromUrl(submission.recordingUrl);
             studentSubmission.files.push({
                 submissionId: submission.id,
@@ -91,7 +91,7 @@ export async function fetchBatchSubmissionsData(batchId: string) {
             });
         }
 
-        if (isDailyListening && submission.notes && submission.notes.trim()) {
+        if (submission.notes && submission.notes.trim()) {
             studentSubmission.textSubmissions.push({
                 submissionId: submission.id,
                 text: submission.notes,
