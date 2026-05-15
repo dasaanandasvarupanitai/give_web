@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { TestimonialCard } from "./testimonials/testimonial-card";
 import { TestimonialFormDialog } from "./testimonials/testimonial-form-dialog";
 
-export function TestimonialManagement() {
+export function TestimonialManagement({ enabled = true }: { enabled?: boolean }) {
     const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -39,13 +39,14 @@ export function TestimonialManagement() {
     });
 
     useEffect(() => {
+        if (!enabled) return;
         const unsubscribe = subscribeTestimonials((testimonialsList) => {
             setTestimonials(testimonialsList);
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

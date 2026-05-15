@@ -135,6 +135,13 @@ export function MobileNav({
                         >
                             Classroom
                         </Link>
+                        <Link
+                            href="/qna"
+                            className="px-4 py-2 text-lg font-medium text-foreground/90 transition-colors hover:text-foreground"
+                            onClick={() => onOpenChange(false)}
+                        >
+                            QnA
+                        </Link>
                         {isTeacher && (
                             <>
                                 <Link

@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { QuoteCard } from "./quotes/quote-card";
 import { QuoteFormDialog } from "./quotes/quote-form-dialog";
 
-export function QuoteManagement() {
+export function QuoteManagement({ enabled = true }: { enabled?: boolean }) {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -33,13 +33,14 @@ export function QuoteManagement() {
     });
 
     useEffect(() => {
+        if (!enabled) return;
         const unsubscribe = subscribeQuotes((quotesList) => {
             setQuotes(quotesList);
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

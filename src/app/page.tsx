@@ -4,6 +4,7 @@ import { Hero } from "@/components/sections/hero";
 import { Prabhupada } from "@/components/sections/prabhupada";
 import { QuoteCarousel } from "@/components/sections/quote-carousel";
 import { Testimonials } from "@/components/sections/testimonials";
+import { QuestionButton } from "@/components/public/question-button";
 
 export default function Home() {
   return (
@@ -23,6 +24,7 @@ export default function Home() {
       <AnimatedSection direction="up" delay={250}>
         <Testimonials />
       </AnimatedSection>
+      <QuestionButton />
     </>
   );
 }

@@ -13,15 +13,21 @@ import { useAuthUser } from "@/hooks/use-auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { LogOut, User as UserIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoginDialog } from "./login-dialog";
 
 export function UserMenu() {
   const { user, initializing } = useAuthUser();
   const [showImage, setShowImage] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  if (initializing) {
-    // While loading auth state, just show nothing (or could show skeleton)
+  // Delay rendering until after hydration to avoid server/client mismatch.
+  // Firebase auth is client-only, so the server has no auth state.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || initializing) {
     return null;
   }
 

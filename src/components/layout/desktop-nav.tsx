@@ -83,6 +83,12 @@ export function DesktopNav({
             >
                 Classroom
             </Link>
+            <Link
+                href="/qna"
+                className="font-medium text-foreground/90 transition-colors hover:text-foreground"
+            >
+                QnA
+            </Link>
             {isTeacher && (
                 <>
                     <Link

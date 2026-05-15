@@ -133,6 +133,7 @@ export function useTaskForm({
                     lateSubmissionDays,
                     instructions,
                     submissionCount: 0,
+                    isPinned: false,
                 });
 
                 toast({

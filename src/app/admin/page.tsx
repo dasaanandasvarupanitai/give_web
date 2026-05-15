@@ -1,6 +1,7 @@
 "use client";
 
 import { AboutPageManager } from "@/components/admin/about-page-manager";
+import { QnAPanel } from "@/components/admin/qna-panel";
 import { CourseManagement } from "@/components/teacher/course-management";
 import { QuoteManagement } from "@/components/teacher/quote-management";
 import { TestimonialManagement } from "@/components/teacher/testimonial-management";
@@ -19,13 +20,20 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeacher } from "@/hooks/use-teacher";
-import { SlidersHorizontal } from "lucide-react";
+import { MessageCircleQuestion, SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminPage() {
     const { isTeacher, initializing, user } = useTeacher();
     const router = useRouter();
+    const [openedSections, setOpenedSections] = useState<Record<string, boolean>>({});
+
+    const handleAccordionChange = (value: string) => {
+        if (value && !openedSections[value]) {
+            setOpenedSections((prev) => ({ ...prev, [value]: true }));
+        }
+    };
 
     useEffect(() => {
         if (!initializing && (!user || !isTeacher)) {
@@ -72,13 +80,20 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="content" className="w-full">
-                <TabsList className="w-full grid grid-cols-1 md:w-auto md:inline-grid md:grid-cols-1 mb-4">
+                <TabsList className="w-full grid grid-cols-2 md:w-auto md:inline-grid md:grid-cols-2 mb-4">
                     <TabsTrigger
                         value="content"
                         className="flex items-center justify-center gap-2"
                     >
                         <SlidersHorizontal className="h-4 w-4" />
                         <span>Content controls</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="qna"
+                        className="flex items-center justify-center gap-2"
+                    >
+                        <MessageCircleQuestion className="h-4 w-4" />
+                        <span>QnA</span>
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="content" className="mt-4 space-y-4">
@@ -102,6 +117,7 @@ export default function AdminPage() {
                                 type="single"
                                 collapsible
                                 className="w-full space-y-2"
+                                onValueChange={handleAccordionChange}
                             >
                                 {/* AboutPageManager handles its own AccordionItem, 
                     but here we are nesting it or keeping it parallel?
@@ -155,7 +171,7 @@ export default function AdminPage() {
                                         Courses
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-2">
-                                        <CourseManagement />
+                                        <CourseManagement enabled={openedSections.courses} />
                                     </AccordionContent>
                                 </AccordionItem>
 
@@ -164,7 +180,7 @@ export default function AdminPage() {
                                         Quotes
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-2">
-                                        <QuoteManagement />
+                                        <QuoteManagement enabled={openedSections.quotes} />
                                     </AccordionContent>
                                 </AccordionItem>
 
@@ -173,10 +189,23 @@ export default function AdminPage() {
                                         Testimonials
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-2">
-                                        <TestimonialManagement />
+                                        <TestimonialManagement enabled={openedSections.testimonials} />
                                     </AccordionContent>
                                 </AccordionItem>
                             </Accordion>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="qna" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <MessageCircleQuestion className="h-5 w-5" />
+                                Questions &amp; Answers
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <QnAPanel />
                         </CardContent>
                     </Card>
                 </TabsContent>

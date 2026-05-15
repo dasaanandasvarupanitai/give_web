@@ -25,8 +25,10 @@ export function AboutPageManager() {
     const [selectedAboutSlug, setSelectedAboutSlug] = useState<string>("");
     const [activeAboutPage, setActiveAboutPage] = useState<AboutPage | null>(null);
     const [savingAbout, setSavingAbout] = useState(false);
+    const [hasOpened, setHasOpened] = useState(false);
 
     useEffect(() => {
+        if (!hasOpened) return;
         (async () => {
             const pages = await getAllAboutPages();
             setAboutPages(pages);
@@ -38,10 +40,10 @@ export function AboutPageManager() {
                 }
             }
         })();
-    }, []);
+    }, [hasOpened]);
 
     useEffect(() => {
-        if (!selectedAboutSlug) return;
+        if (!selectedAboutSlug || !hasOpened) return;
 
         (async () => {
             const page = await getAboutPage(selectedAboutSlug);
@@ -49,7 +51,7 @@ export function AboutPageManager() {
                 setActiveAboutPage(page);
             }
         })();
-    }, [selectedAboutSlug]);
+    }, [selectedAboutSlug, hasOpened]);
 
     const selectedAboutName = useMemo(() => {
         const found = aboutPages.find((p) => p.slug === selectedAboutSlug);
@@ -176,7 +178,14 @@ export function AboutPageManager() {
     };
 
     return (
-        <Accordion type="single" collapsible className="w-full space-y-2">
+        <Accordion
+            type="single"
+            collapsible
+            className="w-full space-y-2"
+            onValueChange={(val) => {
+                if (val === "about") setHasOpened(true);
+            }}
+        >
             <AccordionItem value="about">
                 <AccordionTrigger className="text-base font-semibold">
                     About pages

@@ -21,7 +21,7 @@ function normalizeInternalLinks(html: string): string {
     return html.replace(/https?:\/\/localhost(?::\d+)?/g, "");
 }
 
-export function CourseManagement() {
+export function CourseManagement({ enabled = true }: { enabled?: boolean }) {
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -43,13 +43,14 @@ export function CourseManagement() {
     });
 
     useEffect(() => {
+        if (!enabled) return;
         const unsubscribe = subscribeCourses((coursesList) => {
             setCourses(coursesList);
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

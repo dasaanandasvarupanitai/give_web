@@ -87,3 +87,21 @@
     @apply bg-background text-foreground font-normal overflow-x-hidden w-full max-w-full;
   }
 }
+
+@layer utilities {
+  .animate-pulse-glow {
+    animation: pulse-glow 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 hsl(25 95% 53% / 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 12px hsl(25 95% 53% / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(25 95% 53% / 0);
+  }
+}

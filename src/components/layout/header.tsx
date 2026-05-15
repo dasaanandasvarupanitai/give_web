@@ -121,11 +121,11 @@ export default function Header() {
           onNavClick={handleNavClick}
         />
 
-        <div className="hidden lg:flex items-center">
+        <div className="hidden lg:flex items-center" suppressHydrationWarning>
           <UserMenu />
         </div>
 
-        <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex items-center gap-2 lg:hidden" suppressHydrationWarning>
           <UserMenu />
           <MobileNav
             isOpen={isMobileMenuOpen}
