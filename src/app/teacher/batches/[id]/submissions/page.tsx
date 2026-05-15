@@ -43,6 +43,8 @@ export default function BatchSubmissionsPage() {
     handleDeleteTextConfirm,
     handleDeleteAllClick,
     handleDeleteAllConfirm,
+    handleDeleteSubmissionClick,
+    handleDeleteSubmissionConfirm,
     handleFileSelect,
     handleSelectAll,
     getSelectedFilesForTask,
@@ -159,6 +161,7 @@ export default function BatchSubmissionsPage() {
           onPreviewText={handlePreviewText}
           onDeleteFile={handleDeleteClick}
           onDeleteText={handleDeleteTextClick}
+          onDeleteSubmission={handleDeleteSubmissionClick}
           onDeleteSelected={handleDeleteSelectedClick}
           getSelectedFilesForTask={getSelectedFilesForTask}
           onRefresh={refresh}
@@ -214,6 +217,17 @@ export default function BatchSubmissionsPage() {
         title="Delete Selected Files"
         description={`Are you sure you want to delete ${deleteState.selectedFiles.size} selected file(s)?`}
         confirmText="Delete Selected"
+      />
+
+      {/* Delete Entire Submission Dialog */}
+      <DeleteSubmissionDialog
+        open={deleteState.deleteSubmissionDialogOpen}
+        onOpenChange={(open) => !open && handleDeleteSubmissionClick("", "", [])}
+        onConfirm={handleDeleteSubmissionConfirm}
+        isDeleting={deleteState.deletingSubmission}
+        title="Delete Entire Submission"
+        description={`Are you sure you want to completely delete the submission for "${deleteState.submissionToDelete?.studentName}"? This will remove all files and records, allowing them to submit again. This action cannot be undone.`}
+        confirmText="Delete & Allow Resubmit"
       />
     </div>
   );
