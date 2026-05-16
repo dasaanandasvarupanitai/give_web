@@ -1,7 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 
@@ -9,31 +5,39 @@ export default function Footer() {
   return (
     <footer
       id="contact"
-      className="w-full bg-gradient-to-b from-muted/95 via-muted to-background border-t border-border/40 text-secondary-foreground py-12 md:py-16"
+      className="w-full bg-gradient-to-b from-muted/95 via-muted to-background border-t border-border/40 text-secondary-foreground py-8 md:py-10"
     >
-      <div className="container max-w-screen-2xl grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-        <div className="space-y-4">
-          <h3 className="text-2xl font-headline font-bold">Gaura-vāṇī Institute</h3>
-          <p className="text-secondary-foreground/80">
+      <div className="container max-w-screen-2xl flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+        {/* Institute Info */}
+        <div className="space-y-3 flex-1 min-w-0">
+          <h3 className="text-xl font-headline font-bold leading-tight">
+            Gaura-vāṇī Institute for Vaiṣṇava Education
+          </h3>
+          <p className="text-secondary-foreground/80 text-sm">
             Dedicated to the study and practice of Vaiṣṇava wisdom for a meaningful life.
           </p>
-          <div className="space-y-2">
-            <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 mt-1 shrink-0" />
-              <span>Sridham Mayapur Nabadwip, Nadia, West Bengal || Pincode: 741313</span>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Sridham Mayapur Nabadwip, Nadia, West Bengal — 741313</span>
             </div>
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 shrink-0" />
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 shrink-0" />
               <span>+91 89729 16108</span>
             </div>
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 shrink-0" />
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 shrink-0" />
               <a href="mailto:studyatgive.108@gmail.com" className="hover:underline">
                 studyatgive.108@gmail.com
               </a>
             </div>
           </div>
-          <div className="flex space-x-4 pt-2">
+        </div>
+
+        {/* Social Links */}
+        <div className="flex md:flex-col items-center md:items-end gap-4 md:gap-3 shrink-0">
+          <p className="hidden md:block text-xs text-secondary-foreground/60 uppercase tracking-widest font-medium">Follow Us</p>
+          <div className="flex gap-4">
             <Link
               href="https://www.facebook.com/vaikunthagunanuvarnana"
               target="_blank"
@@ -69,31 +73,10 @@ export default function Footer() {
             </Link>
           </div>
         </div>
-        <div className="md:col-span-2 space-y-4">
-          <h3 className="text-2xl font-headline font-bold">Get in Touch</h3>
-          <p className="text-secondary-foreground/80">
-            Have questions? Fill out the form below, and we'll get back to you.
-          </p>
-          <form className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" placeholder="Your Name" type="text" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input id="email" placeholder="your.email@example.com" type="email" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="message">Message</Label>
-              <Textarea id="message" placeholder="Your question or message..." rows={4} />
-            </div>
-            <Button type="submit" className="w-full sm:w-auto">Send Message</Button>
-          </form>
-        </div>
       </div>
-      <div className="container max-w-screen-2xl mt-12 text-center text-sm text-secondary-foreground/60">
+
+      {/* Bottom bar */}
+      <div className="container max-w-screen-2xl mt-6 pt-5 border-t border-border/30 text-center text-xs text-secondary-foreground/60">
         <p>&copy; {new Date().getFullYear()} Gaura-vāṇī Institute for Vaiṣṇava Education. All Rights Reserved.</p>
       </div>
     </footer>
