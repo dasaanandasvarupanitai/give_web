@@ -77,7 +77,9 @@ export function FileUploader({
             <CardHeader>
                 <CardTitle>File Upload</CardTitle>
                 <CardDescription>
-                    Upload files: PDF, documents, pictures, videos, or audio (Max 500MB per file)
+                    {taskType === "slokaMemorization"
+                        ? "Upload the recorded videos (Max 500MB per file)"
+                        : "Upload files: PDF, documents, pictures, videos, or audio (Max 500MB per file)"}
                 </CardDescription>
             </CardHeader>
             <CardContent>
