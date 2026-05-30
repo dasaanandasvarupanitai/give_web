@@ -52,6 +52,7 @@ export async function submitQuestion(
     const docRef = doc(db, "publicQuestions", id);
     await setDoc(docRef, {
       name: data.name,
+      country: data.country,
       whatsappNumber: data.whatsappNumber,
       question: data.question,
       createdAt: Timestamp.now(),
