@@ -9,6 +9,8 @@ import { CheckCircle2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,149 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { submitQuestion } from "@/lib/services/question-service";
+
+// ==================== Country Codes List ====================
+const COUNTRY_CODES = [
+  { code: "+91", name: "India", flag: "🇮🇳" },
+  { code: "+880", name: "Bangladesh", flag: "🇧🇩" },
+  // Sorted alphabetically
+  { code: "+93", name: "Afghanistan", flag: "🇦🇫" },
+  { code: "+355", name: "Albania", flag: "🇦🇱" },
+  { code: "+213", name: "Algeria", flag: "🇩🇿" },
+  { code: "+376", name: "Andorra", flag: "🇦🇩" },
+  { code: "+244", name: "Angola", flag: "🇦🇴" },
+  { code: "+54", name: "Argentina", flag: "🇦🇷" },
+  { code: "+374", name: "Armenia", flag: "🇦🇲" },
+  { code: "+61", name: "Australia", flag: "🇦🇺" },
+  { code: "+43", name: "Austria", flag: "🇦🇹" },
+  { code: "+994", name: "Azerbaijan", flag: "🇦🇿" },
+  { code: "+973", name: "Bahrain", flag: "🇧🇭" },
+  { code: "+32", name: "Belgium", flag: "🇧🇪" },
+  { code: "+501", name: "Belize", flag: "🇧🇿" },
+  { code: "+229", name: "Benin", flag: "🇧🇯" },
+  { code: "+975", name: "Bhutan", flag: "🇧🇹" },
+  { code: "+591", name: "Bolivia", flag: "🇧🇴" },
+  { code: "+387", name: "Bosnia and Herzegovina", flag: "🇧🇦" },
+  { code: "+267", name: "Botswana", flag: "🇧🇼" },
+  { code: "+55", name: "Brazil", flag: "🇧🇷" },
+  { code: "+673", name: "Brunei", flag: "🇧🇳" },
+  { code: "+359", name: "Bulgaria", flag: "🇧🇬" },
+  { code: "+257", name: "Burundi", flag: "🇧🇮" },
+  { code: "+855", name: "Cambodia", flag: "🇰🇭" },
+  { code: "+237", name: "Cameroon", flag: "🇨🇲" },
+  { code: "+1", name: "Canada", flag: "🇨🇦" },
+  { code: "+56", name: "Chile", flag: "🇨🇱" },
+  { code: "+86", name: "China", flag: "🇨🇳" },
+  { code: "+57", name: "Colombia", flag: "🇨🇴" },
+  { code: "+242", name: "Congo", flag: "🇨🇬" },
+  { code: "+506", name: "Costa Rica", flag: "🇨🇷" },
+  { code: "+385", name: "Croatia", flag: "🇭🇷" },
+  { code: "+53", name: "Cuba", flag: "🇨🇺" },
+  { code: "+357", name: "Cyprus", flag: "🇨🇾" },
+  { code: "+420", name: "Czech Republic", flag: "🇨🇿" },
+  { code: "+45", name: "Denmark", flag: "🇩🇰" },
+  { code: "+593", name: "Ecuador", flag: "🇪🇨" },
+  { code: "+20", name: "Egypt", flag: "🇪🇬" },
+  { code: "+503", name: "El Salvador", flag: "🇸🇻" },
+  { code: "+372", name: "Estonia", flag: "🇪🇪" },
+  { code: "+251", name: "Ethiopia", flag: "🇪🇹" },
+  { code: "+679", name: "Fiji", flag: "🇫🇯" },
+  { code: "+358", name: "Finland", flag: "🇫🇮" },
+  { code: "+33", name: "France", flag: "🇫🇷" },
+  { code: "+995", name: "Georgia", flag: "🇬🇪" },
+  { code: "+49", name: "Germany", flag: "🇩🇪" },
+  { code: "+30", name: "Greece", flag: "🇬🇷" },
+  { code: "+502", name: "Guatemala", flag: "🇬🇹" },
+  { code: "+509", name: "Haiti", flag: "🇭🇹" },
+  { code: "+504", name: "Honduras", flag: "🇭🇳" },
+  { code: "+852", name: "Hong Kong", flag: "🇭🇰" },
+  { code: "+36", name: "Hungary", flag: "🇭🇺" },
+  { code: "+354", name: "Iceland", flag: "🇮🇸" },
+  { code: "+62", name: "Indonesia", flag: "🇮🇩" },
+  { code: "+98", name: "Iran", flag: "🇮🇷" },
+  { code: "+964", name: "Iraq", flag: "🇮🇶" },
+  { code: "+353", name: "Ireland", flag: "🇮🇪" },
+  { code: "+39", name: "Italy", flag: "🇮🇹" },
+  { code: "+81", name: "Japan", flag: "🇯🇵" },
+  { code: "+962", name: "Jordan", flag: "🇯🇴" },
+  { code: "+7", name: "Kazakhstan", flag: "🇰🇿" },
+  { code: "+254", name: "Kenya", flag: "🇰🇪" },
+  { code: "+965", name: "Kuwait", flag: "🇰🇼" },
+  { code: "+996", name: "Kyrgyzstan", flag: "🇰🇬" },
+  { code: "+856", name: "Laos", flag: "🇱🇦" },
+  { code: "+371", name: "Latvia", flag: "🇱🇻" },
+  { code: "+961", name: "Lebanon", flag: "🇱🇧" },
+  { code: "+218", name: "Libya", flag: "🇱🇾" },
+  { code: "+370", name: "Lithuania", flag: "🇱🇹" },
+  { code: "+352", name: "Luxembourg", flag: "🇱🇺" },
+  { code: "+853", name: "Macau", flag: "🇲🇴" },
+  { code: "+389", name: "Macedonia", flag: "🇲🇰" },
+  { code: "+261", name: "Madagascar", flag: "🇲🇬" },
+  { code: "+60", name: "Malaysia", flag: "🇲🇾" },
+  { code: "+960", name: "Maldives", flag: "🇲🇻" },
+  { code: "+356", name: "Malta", flag: "🇲🇹" },
+  { code: "+230", name: "Mauritius", flag: "🇲🇺" },
+  { code: "+52", name: "Mexico", flag: "🇲🇽" },
+  { code: "+373", name: "Moldova", flag: "🇲🇩" },
+  { code: "+377", name: "Monaco", flag: "🇲🇨" },
+  { code: "+976", name: "Mongolia", flag: "🇲🇳" },
+  { code: "+382", name: "Montenegro", flag: "🇲🇪" },
+  { code: "+212", name: "Morocco", flag: "🇲🇦" },
+  { code: "+95", name: "Myanmar", flag: "🇲🇲" },
+  { code: "+264", name: "Namibia", flag: "🇳🇦" },
+  { code: "+977", name: "Nepal", flag: "🇳🇵" },
+  { code: "+31", name: "Netherlands", flag: "🇳🇱" },
+  { code: "+64", name: "New Zealand", flag: "🇳🇿" },
+  { code: "+505", name: "Nicaragua", flag: "🇳🇮" },
+  { code: "+234", name: "Nigeria", flag: "🇳🇬" },
+  { code: "+47", name: "Norway", flag: "🇳🇴" },
+  { code: "+968", name: "Oman", flag: "🇴🇲" },
+  { code: "+92", name: "Pakistan", flag: "🇵🇰" },
+  { code: "+507", name: "Panama", flag: "🇵🇦" },
+  { code: "+595", name: "Paraguay", flag: "🇵🇾" },
+  { code: "+51", name: "Peru", flag: "🇵🇪" },
+  { code: "+63", name: "Philippines", flag: "🇵🇭" },
+  { code: "+48", name: "Poland", flag: "🇵🇱" },
+  { code: "+351", name: "Portugal", flag: "🇵🇹" },
+  { code: "+974", name: "Qatar", flag: "🇶🇦" },
+  { code: "+40", name: "Romania", flag: "🇷🇴" },
+  { code: "+7", name: "Russia", flag: "🇷🇺" },
+  { code: "+250", name: "Rwanda", flag: "🇷🇼" },
+  { code: "+966", name: "Saudi Arabia", flag: "🇸🇦" },
+  { code: "+381", name: "Serbia", flag: "🇷🇸" },
+  { code: "+65", name: "Singapore", flag: "🇸🇬" },
+  { code: "+421", name: "Slovakia", flag: "🇸🇰" },
+  { code: "+386", name: "Slovenia", flag: "🇸🇮" },
+  { code: "+27", name: "South Africa", flag: "🇿🇦" },
+  { code: "+82", name: "South Korea", flag: "🇰🇷" },
+  { code: "+34", name: "Spain", flag: "🇪🇸" },
+  { code: "+94", name: "Sri Lanka", flag: "🇱🇰" },
+  { code: "+46", name: "Sweden", flag: "🇸🇪" },
+  { code: "+41", name: "Switzerland", flag: "🇨🇭" },
+  { code: "+886", name: "Taiwan", flag: "🇹🇼" },
+  { code: "+255", name: "Tanzania", flag: "🇹🇿" },
+  { code: "+66", name: "Thailand", flag: "🇹🇭" },
+  { code: "+216", name: "Tunisia", flag: "🇹🇳" },
+  { code: "+90", name: "Turkey", flag: "🇹🇷" },
+  { code: "+256", name: "Uganda", flag: "🇺🇬" },
+  { code: "+380", name: "Ukraine", flag: "🇺🇦" },
+  { code: "+971", name: "United Arab Emirates", flag: "🇦🇪" },
+  { code: "+44", name: "United Kingdom", flag: "🇬🇧" },
+  { code: "+1", name: "United States", flag: "🇺🇸" },
+  { code: "+598", name: "Uruguay", flag: "🇺🇾" },
+  { code: "+998", name: "Uzbekistan", flag: "🇺🇿" },
+  { code: "+58", name: "Venezuela", flag: "🇻🇪" },
+  { code: "+84", name: "Vietnam", flag: "🇻🇳" },
+  { code: "+263", name: "Zimbabwe", flag: "🇿🇼" }
+];
 
 // ==================== Types ====================
 
@@ -38,6 +182,7 @@ type DialogView = "form" | "success" | "error";
 const questionSchema = z.object({
   name: z.string().min(1, "Name is required"),
   country: z.string().min(1, "Country is required"),
+  countryCode: z.string().min(1, "Country code is required"),
   whatsappNumber: z.string().min(1, "WhatsApp number is required"),
   question: z.string().min(1, "Question is required"),
 });
@@ -55,6 +200,7 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
     defaultValues: {
       name: "",
       country: "",
+      countryCode: "+91_India",
       whatsappNumber: "",
       question: "",
     },
@@ -62,7 +208,20 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
 
   async function onSubmit(data: QuestionFormValues) {
     setIsSubmitting(true);
-    const result = await submitQuestion(data);
+    
+    // Extract the actual calling code (e.g. "+91" from "+91_India")
+    const actualCode = data.countryCode.split("_")[0];
+    
+    // Concatenate the selected country code with the whatsapp number (strip spaces/pluses/leading zeros)
+    const cleanedNumber = data.whatsappNumber.trim().replace(/^\+/, "").replace(/^0+/, "").replace(/\s+/g, "");
+    const combinedWhatsapp = `${actualCode}${cleanedNumber}`;
+
+    const result = await submitQuestion({
+      name: data.name,
+      country: data.country,
+      whatsappNumber: combinedWhatsapp,
+      question: data.question,
+    });
     setIsSubmitting(false);
 
     if (result.ok) {
@@ -85,6 +244,10 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl sm:w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogTitle className="sr-only">Ask Your Question</DialogTitle>
+        <DialogDescription className="sr-only">
+          Submit your question to devotees for the next QnA session.
+        </DialogDescription>
 
         {view === "form" && (
           <div className="flex flex-col md:flex-row min-h-[420px]">
@@ -162,26 +325,55 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="whatsappNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          WhatsApp Number{" "}
-                          <span className="text-muted-foreground font-normal">(হোয়াট্সঅ্যাপ নম্বর)</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="+880 17XX XXXXXX"
-                            className="border-border/60 focus-visible:ring-primary/50"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-1.5">
+                    <FormLabel>
+                      WhatsApp Number{" "}
+                      <span className="text-muted-foreground font-normal">(হোয়াট্সঅ্যাপ নম্বর)</span>
+                    </FormLabel>
+                    <div className="flex gap-2 items-start">
+                      <FormField
+                        control={form.control}
+                        name="countryCode"
+                        render={({ field }) => (
+                          <FormItem className="w-[140px] shrink-0 space-y-0">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="border-border/60 focus:ring-primary/50">
+                                  <SelectValue placeholder="+91" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="max-h-[250px]">
+                                {COUNTRY_CODES.map((item, idx) => (
+                                  <SelectItem key={`${item.code}-${item.name}-${idx}`} value={`${item.code}_${item.name}`}>
+                                    <span className="mr-1.5">{item.flag}</span>
+                                    <span className="font-medium">{item.code}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-1.5">({item.name})</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="whatsappNumber"
+                        render={({ field }) => (
+                          <FormItem className="flex-1 space-y-0">
+                            <FormControl>
+                              <Input
+                                placeholder="17XX XXXXXX"
+                                className="border-border/60 focus-visible:ring-primary/50"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage className="mt-1.5" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
                   <FormField
                     control={form.control}
