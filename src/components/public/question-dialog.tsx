@@ -1,10 +1,13 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Check } from "lucide-react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { cn } from "@/lib/utils";
 
 import {
   Dialog,
@@ -27,7 +30,6 @@ import {
 import {
   Select,
   SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -189,6 +191,39 @@ const questionSchema = z.object({
 
 type QuestionFormValues = z.infer<typeof questionSchema>;
 
+// ==================== Custom Item for Country Code Selector ====================
+const CountrySelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    flag: string;
+    code: string;
+    countryName: string;
+  }
+>(({ className, flag, code, countryName, ...props }, ref) => (
+  <SelectPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <SelectPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </SelectPrimitive.ItemIndicator>
+    </span>
+
+    <SelectPrimitive.ItemText>
+      <span>{flag}</span>
+      <span className="font-medium ml-1.5">{code}</span>
+    </SelectPrimitive.ItemText>
+    
+    <span className="text-[10px] text-muted-foreground ml-1.5">({countryName})</span>
+  </SelectPrimitive.Item>
+));
+CountrySelectItem.displayName = "CountrySelectItem";
+
 // ==================== Component ====================
 
 export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
@@ -335,7 +370,7 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
                         control={form.control}
                         name="countryCode"
                         render={({ field }) => (
-                          <FormItem className="w-[140px] shrink-0 space-y-0">
+                          <FormItem className="w-[100px] shrink-0 space-y-0">
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger className="border-border/60 focus:ring-primary/50">
@@ -344,11 +379,13 @@ export function QuestionDialog({ open, onOpenChange }: QuestionDialogProps) {
                               </FormControl>
                               <SelectContent className="max-h-[250px]">
                                 {COUNTRY_CODES.map((item, idx) => (
-                                  <SelectItem key={`${item.code}-${item.name}-${idx}`} value={`${item.code}_${item.name}`}>
-                                    <span className="mr-1.5">{item.flag}</span>
-                                    <span className="font-medium">{item.code}</span>
-                                    <span className="text-[10px] text-muted-foreground ml-1.5">({item.name})</span>
-                                  </SelectItem>
+                                  <CountrySelectItem
+                                    key={`${item.code}-${item.name}-${idx}`}
+                                    value={`${item.code}_${item.name}`}
+                                    flag={item.flag}
+                                    code={item.code}
+                                    countryName={item.name}
+                                  />
                                 ))}
                               </SelectContent>
                             </Select>
