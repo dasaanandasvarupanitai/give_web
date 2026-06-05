@@ -96,6 +96,14 @@ export function useTaskSubmissionForm({
                     });
                     return;
                 }
+                if (task.type === "slokaMemorization" && selectedFiles.length > 1) {
+                    toast({
+                        title: "Validation Error",
+                        description: "You can only upload a single file for Sloka Memorization tasks.",
+                        variant: "destructive",
+                    });
+                    return;
+                }
             }
         }
 

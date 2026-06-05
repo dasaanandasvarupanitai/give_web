@@ -409,7 +409,11 @@ export default function TaskSubmissionPage() {
                 form.setAudioBlob(null);
                 form.setIsRecording(false);
               }
-              form.setSelectedFiles((prev) => [...prev, ...files]);
+              if (task?.type === "slokaMemorization") {
+                form.setSelectedFiles(files.slice(0, 1));
+              } else {
+                form.setSelectedFiles((prev) => [...prev, ...files]);
+              }
             }}
             onFileRemoved={(index) => {
               form.setSelectedFiles((prev) => prev.filter((_, i) => i !== index));

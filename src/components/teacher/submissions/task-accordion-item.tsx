@@ -17,9 +17,10 @@ import {
     getTaskTypeIcon,
     getTaskTypeLabel,
 } from "@/lib/utils/task-helpers";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download } from "lucide-react";
 import { StudentAccordionItem } from "./student-accordion-item";
 import type { StudentFile, StudentSubmission, TaskFiles } from "./types";
+import { downloadSlokaSubmissionsAsExcel } from "@/lib/utils/export-students";
 
 interface TaskAccordionItemProps {
     task: Task;
@@ -137,6 +138,22 @@ export function TaskAccordionItem({
                 </div>
             </AccordionTrigger>
             <AccordionContent className="pt-4 pb-6">
+                {task.type === "slokaMemorization" && (
+                    <div className="flex justify-end mb-4">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const submittedIds = new Set(studentSubmissions.map(s => s.studentId));
+                                downloadSlokaSubmissionsAsExcel(task.title, Array.from(enrollmentsMap.values()), submittedIds);
+                            }}
+                            className="border-orange-500 hover:bg-orange-50 text-orange-600 h-8 px-3"
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Submission Checklist
+                        </Button>
+                    </div>
+                )}
                 {studentSubmissions.length === 0 ? (
                     <div className="py-8 text-center text-muted-foreground">
                         <p>No student submissions for this task.</p>

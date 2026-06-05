@@ -62,7 +62,26 @@ export function FileUploader({
             }
 
             if (validFiles.length > 0) {
-                onFilesSelected(validFiles);
+                if (taskType === "slokaMemorization") {
+                    if (validFiles.length > 1) {
+                        toast({
+                            title: "Single File Limit",
+                            description: "You can only upload a single file for Sloka Memorization tasks.",
+                            variant: "destructive",
+                        });
+                    }
+                    if (selectedFiles.length > 0) {
+                        toast({
+                            title: "Upload Blocked",
+                            description: "You can only upload a single file. Please remove the existing file first.",
+                            variant: "destructive",
+                        });
+                    } else {
+                        onFilesSelected(validFiles.slice(0, 1));
+                    }
+                } else {
+                    onFilesSelected(validFiles);
+                }
             }
 
             // Reset input
@@ -86,13 +105,14 @@ export function FileUploader({
                 <input
                     ref={fileInputRef}
                     type="file"
-                    multiple
+                    multiple={taskType !== "slokaMemorization"}
                     accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.ogg,.m4a,.aac,.flac"
                     onChange={handleFileSelect}
                     className="hidden"
                     disabled={disabled ||
                         (taskType === "dailyListening" && activeSubmissionType === 'text') ||
-                        (taskType === "dailyListening" && activeSubmissionType === 'audio')
+                        (taskType === "dailyListening" && activeSubmissionType === 'audio') ||
+                        (taskType === "slokaMemorization" && selectedFiles.length >= 1)
                     }
                 />
                 <Button
@@ -102,7 +122,8 @@ export function FileUploader({
                     disabled={disabled ||
                         isUploading ||
                         (taskType === "dailyListening" && activeSubmissionType === 'text') ||
-                        (taskType === "dailyListening" && activeSubmissionType === 'audio')
+                        (taskType === "dailyListening" && activeSubmissionType === 'audio') ||
+                        (taskType === "slokaMemorization" && selectedFiles.length >= 1)
                     }
                 >
                     {isUploading ? (
