@@ -24,3 +24,4 @@ export * from "./enrollment-service";
 export * from "./submission-service";
 export * from "./task-service";
 export * from "./user-service";
+export * from "./batch-request-service";

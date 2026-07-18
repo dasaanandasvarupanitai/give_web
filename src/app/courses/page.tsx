@@ -9,10 +9,13 @@ import { BookOpen, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import * as React from 'react';
+import { BatchRequestDialog } from '@/components/public/batch-request-dialog';
 
 export default function CoursesPage() {
     const [courses, setCourses] = React.useState<Course[]>([]);
     const [loading, setLoading] = React.useState(true);
+    const [selectedCourse, setSelectedCourse] = React.useState<Course | null>(null);
+    const [isRequestOpen, setIsRequestOpen] = React.useState(false);
 
     React.useEffect(() => {
         const unsubscribe = subscribeCourses(
@@ -82,16 +85,26 @@ export default function CoursesPage() {
                                                 {course.title}
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardFooter className="mt-auto flex-shrink-0">
+                                        <CardFooter className="mt-auto flex-shrink-0 flex flex-col gap-2">
                                             <Button
                                                 asChild
-                                                className="w-full text-sm sm:text-base"
+                                                className="w-full text-sm sm:text-base bg-primary text-primary-foreground hover:bg-primary/95"
                                             >
                                                 <Link
                                                     href={`/courses/${course.id}`}
                                                 >
                                                     Learn More
                                                 </Link>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full text-sm sm:text-base border-primary text-primary hover:bg-primary/10"
+                                                onClick={() => {
+                                                    setSelectedCourse(course);
+                                                    setIsRequestOpen(true);
+                                                }}
+                                            >
+                                                Request For Future Batch
                                             </Button>
                                         </CardFooter>
                                     </Card>
@@ -101,7 +114,11 @@ export default function CoursesPage() {
                     </AnimatedSection>
                 )}
             </div>
+            <BatchRequestDialog
+                course={selectedCourse}
+                isOpen={isRequestOpen}
+                onOpenChange={setIsRequestOpen}
+            />
         </div>
     );
 }
-

@@ -5,6 +5,7 @@ import { QnAPanel } from "@/components/admin/qna-panel";
 import { CourseManagement } from "@/components/teacher/course-management";
 import { QuoteManagement } from "@/components/teacher/quote-management";
 import { TestimonialManagement } from "@/components/teacher/testimonial-management";
+import { GlobalRequestsSection } from "@/components/admin/global-requests-section";
 import {
     Accordion,
     AccordionContent,
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeacher } from "@/hooks/use-teacher";
-import { MessageCircleQuestion, SlidersHorizontal } from "lucide-react";
+import { MessageCircleQuestion, SlidersHorizontal, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -28,6 +29,7 @@ export default function AdminPage() {
     const { isTeacher, initializing, user } = useTeacher();
     const router = useRouter();
     const [openedSections, setOpenedSections] = useState<Record<string, boolean>>({});
+    const [activeTab, setActiveTab] = useState("content");
 
     const handleAccordionChange = (value: string) => {
         if (value && !openedSections[value]) {
@@ -79,8 +81,8 @@ export default function AdminPage() {
                 </div>
             </div>
 
-            <Tabs defaultValue="content" className="w-full">
-                <TabsList className="w-full grid grid-cols-2 md:w-auto md:inline-grid md:grid-cols-2 mb-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="w-full grid grid-cols-3 md:w-auto md:inline-grid md:grid-cols-3 mb-4">
                     <TabsTrigger
                         value="content"
                         className="flex items-center justify-center gap-2"
@@ -94,6 +96,13 @@ export default function AdminPage() {
                     >
                         <MessageCircleQuestion className="h-4 w-4" />
                         <span>QnA</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="requests"
+                        className="flex items-center justify-center gap-2"
+                    >
+                        <Users className="h-4 w-4" />
+                        <span>Batch Requests</span>
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="content" className="mt-4 space-y-4">
@@ -206,6 +215,19 @@ export default function AdminPage() {
                         </CardHeader>
                         <CardContent>
                             <QnAPanel />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="requests" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Users className="h-5 w-5" />
+                                Future Batch Requests
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <GlobalRequestsSection enabled={activeTab === "requests"} />
                         </CardContent>
                     </Card>
                 </TabsContent>

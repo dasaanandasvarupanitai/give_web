@@ -3,6 +3,7 @@ import Header from '@/components/layout/header';
 import { cn } from '@/lib/utils';
 import type { Metadata } from 'next';
 import './globals.css';
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: 'Gaura-vāṇī Institute for Vaiṣṇava Education (GIVE)',
@@ -32,6 +33,7 @@ export default function RootLayout({
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <Toaster />
       </body>
     </html>
   );

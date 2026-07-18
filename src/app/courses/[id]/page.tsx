@@ -8,6 +8,7 @@ import { ArrowLeft, BookOpen, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BatchRequestDialog } from "@/components/public/batch-request-dialog";
 
 // Normalize any localhost absolute URLs saved from the editor back to relative/internal links
 function normalizeInternalLinks(html: string): string {
@@ -24,6 +25,7 @@ export default function CourseDetailPage() {
     const [course, setCourse] = useState<Course | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isRequestOpen, setIsRequestOpen] = useState(false);
 
     useEffect(() => {
         if (!courseId) return;
@@ -94,7 +96,7 @@ export default function CourseDetailPage() {
                     />
                 </div>
                 <CardContent className="p-6 md:p-8">
-                    <h1 className="text-3xl md:text-4xl font-headline font-bold mb-6">
+                    <h1 className="text-3xl md:text-4xl font-headline font-bold text-foreground mb-6 border-b pb-4">
                         {course.title}
                     </h1>
                     <div
@@ -108,8 +110,27 @@ export default function CourseDetailPage() {
                        [&_ul.checklist]:list-none [&_ul.checklist]:pl-0 [&_ul.checklist>li]:relative [&_ul.checklist>li]:ps-6 [&_ul.checklist>li]:my-2 [&_ul.checklist>li]:before:content-['✔'] [&_ul.checklist>li]:before:text-primary [&_ul.checklist>li]:before:absolute [&_ul.checklist>li]:before:left-0 [&_ul.checklist>li]:before:top-0"
                         dangerouslySetInnerHTML={{ __html: normalizeInternalLinks(course.description) }}
                     />
+
+                    <div className="mt-8 pt-6 border-t flex flex-col items-center gap-4 text-center">
+                        <div className="text-muted-foreground max-w-md text-sm sm:text-base">
+                            <span className="font-bold text-foreground block mb-1.5">Interested in taking this course?</span>
+                            <span>Request enrollment for a future batch and we will notify you as soon as the schedule is announced.</span>
+                        </div>
+                        <Button
+                            onClick={() => setIsRequestOpen(true)}
+                            className="bg-primary text-primary-foreground hover:bg-primary/95 px-8 py-5 text-base font-semibold shadow-lg transition-all hover:scale-[1.03] w-full sm:w-auto"
+                        >
+                            Request For Future Batch
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
+
+            <BatchRequestDialog
+                course={course}
+                isOpen={isRequestOpen}
+                onOpenChange={setIsRequestOpen}
+            />
         </div>
     );
 }
