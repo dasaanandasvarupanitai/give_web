@@ -8,6 +8,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { StudentAnalytics } from "@/lib/types/analytics";
+import { formatPercentage } from "@/lib/utils/analytics";
 
 interface AnalyticsSummaryCardsProps {
     analytics: StudentAnalytics[];
@@ -46,7 +47,7 @@ export function AnalyticsSummaryCards({
                         </p>
                         <p className="text-2xl font-bold">
                             {analytics.length > 0
-                                ? Math.round(
+                                ? formatPercentage(
                                     analytics.reduce((sum, a) => sum + a.percentage, 0) /
                                     analytics.length
                                 )

@@ -17,6 +17,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { StudentAnalytics } from "@/lib/types/analytics";
+import { formatPercentage } from "@/lib/utils/analytics";
 
 interface AnalyticsTableProps {
     analytics: StudentAnalytics[];
@@ -83,7 +84,7 @@ export function AnalyticsTable({ analytics }: AnalyticsTableProps) {
                                                                 : "destructive"
                                                 }
                                             >
-                                                {item.percentage}%
+                                                {formatPercentage(item.percentage)}%
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-center">

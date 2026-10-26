@@ -16,20 +16,371 @@ import {
     collection,
     deleteDoc,
     doc,
+    documentId,
+    getCountFromServer,
     getDoc,
     getDocs,
     limit,
     onSnapshot,
+    orderBy,
     query,
     setDoc,
     Timestamp,
     updateDoc,
     where,
     writeBatch,
+    type QueryConstraint,
+    type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { getSubmissionsByTask } from "./submission-service";
 
 // ==================== Task Operations ====================
+
+/**
+ * Number of non-pinned tasks loaded initially and per "Load More" click
+ * on the student and teacher dashboards.
+ */
+export const TASKS_PAGE_SIZE = 10;
+
+/**
+ * Server-side safety margin for the "started" cutoff used by the paged
+ * window query. The client-side isTaskStarted() check remains the final
+ * visibility authority (it derives visibility from the Bangladesh calendar
+ * date in the user's local timezone), so this margin only guarantees the
+ * query never excludes a task the client would consider started — even for
+ * browsers in timezones ahead of Bangladesh.
+ */
+const TASKS_START_CUTOFF_MARGIN_MS = 14 * 60 * 60 * 1000;
+
+/** Result of the paged task subscription used by the dashboards. */
+export interface PagedTasksSnapshot {
+    /** Tasks ready to render: pinned first (always), then the loaded window. */
+    tasks: Task[];
+    /**
+     * True when more tasks exist beyond the loaded window and "Load More"
+     * should be shown. Always false in legacy mode (everything is loaded).
+     */
+    hasMore: boolean;
+    /** Total number of tasks in the batch (from a server count query). */
+    totalTasks: number;
+    /**
+     * Tasks that have started (visible to students). Only meaningful in
+     * paged mode; equals tasks.length in legacy mode.
+     */
+    startedTasks: number;
+    /**
+     * True when the optimized paged queries could not be used (e.g. the
+     * composite index is not deployed yet, or tasks missing `startDate`
+     * were detected) and the full task list was loaded instead — identical
+     * to the pre-pagination behavior.
+     */
+    legacyMode: boolean;
+}
+
+function sortTasksPinnedFirst(tasks: Task[]): void {
+    tasks.sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        const aDate = a.startDate || a.createdAt;
+        const bDate = b.startDate || b.createdAt;
+        return bDate.getTime() - aDate.getTime();
+    });
+}
+
+function taskFromSnapshotDoc(doc: QueryDocumentSnapshot): Task {
+    return taskFromFirestore(doc.id, doc.data() as TaskFirestore);
+}
+
+/**
+ * Counts total / started / future tasks for a batch in 3 cheap aggregate
+ * queries. The difference `total - started - future` exposes tasks whose
+ * `startDate` field is missing entirely — those are "always visible" in the
+ * legacy client-side logic and cannot be queried with a startDate-ordered
+ * window, so callers fall back to the full list when any exist.
+ * The started/future split uses the exact current time (no margin) so the
+ * started count matches what the client-side visibility check displays.
+ * Returns null when the count queries themselves fail.
+ */
+async function fetchTaskCounts(
+    batchId: string
+): Promise<{ total: number; started: number; future: number } | null> {
+    try {
+        const now = Timestamp.now();
+        const col = collection(db, "tasks");
+        const [totalSnap, startedSnap, futureSnap] = await Promise.all([
+            getCountFromServer(query(col, where("batchId", "==", batchId))),
+            getCountFromServer(
+                query(col, where("batchId", "==", batchId), where("startDate", "<=", now))
+            ),
+            getCountFromServer(
+                query(col, where("batchId", "==", batchId), where("startDate", ">", now))
+            ),
+        ]);
+        return {
+            total: totalSnap.data().count,
+            started: startedSnap.data().count,
+            future: futureSnap.data().count,
+        };
+    } catch (error) {
+        console.error("[task-service] Task count queries failed:", error);
+        return null;
+    }
+}
+
+function mergePagedTasks(
+    pinned: Task[],
+    windowTasks: Task[],
+    windowFetched: number,
+    pageSize: number,
+    includeFutureTasks: boolean,
+    counts: { total: number; started: number }
+): PagedTasksSnapshot {
+    const pinnedIds = new Set(pinned.map((t) => t.id));
+    const other = windowTasks.filter((t) => !pinnedIds.has(t.id));
+    // The window query's cutoff is generous (see TASKS_START_CUTOFF_MARGIN_MS);
+    // the client-side visibility check stays the source of truth, exactly as
+    // in the legacy full-list path.
+    const visiblePinned = includeFutureTasks
+        ? pinned
+        : pinned.filter((t) => isTaskStarted(t.startDate));
+    const visibleOther = includeFutureTasks
+        ? other
+        : other.filter((t) => isTaskStarted(t.startDate));
+    const tasks = [...visiblePinned, ...visibleOther];
+    sortTasksPinnedFirst(tasks);
+    return {
+        tasks,
+        hasMore: windowFetched >= pageSize,
+        totalTasks: counts.total,
+        startedTasks: counts.started,
+        legacyMode: false,
+    };
+}
+
+function pagedWindowQuery(
+    batchId: string,
+    pageSize: number,
+    includeFutureTasks: boolean,
+    cutoff: Timestamp
+) {
+    const constraints: QueryConstraint[] = [where("batchId", "==", batchId)];
+    if (!includeFutureTasks) {
+        // Students only see started tasks; teachers manage scheduled
+        // (future) tasks too, which the date-descending order naturally
+        // surfaces first — matching the legacy client-side sort.
+        constraints.push(where("startDate", "<=", cutoff));
+    }
+    constraints.push(orderBy("startDate", "desc"), limit(pageSize));
+    return query(collection(db, "tasks"), ...constraints);
+}
+
+/**
+ * Real-time subscription for the dashboards: pinned tasks are always loaded
+ * (regardless of age), other tasks are loaded newest-first in pages of
+ * `pageSize`. Increasing `pageSize` loads more. Falls back to the legacy
+ * full-list subscription whenever the optimized queries cannot run, so
+ * behavior never regresses.
+ */
+export function subscribeTasksByBatchPaged(
+    batchId: string,
+    options: { pageSize: number; includeFutureTasks: boolean },
+    callback: (snapshot: PagedTasksSnapshot) => void
+): () => void {
+    let cancelled = false;
+    let legacyUnsubscribe: (() => void) | null = null;
+    let unsubs: (() => void)[] = [];
+    const state: {
+        pinned: Task[] | null;
+        window: Task[] | null;
+        windowFetched: number;
+        counts: { total: number; started: number } | null;
+        legacy: boolean;
+    } = {
+        pinned: null,
+        window: null,
+        windowFetched: 0,
+        counts: null,
+        legacy: false,
+    };
+
+    const startLegacy = (reason: string) => {
+        if (cancelled || state.legacy) return;
+        state.legacy = true;
+        unsubs.forEach((u) => u());
+        unsubs = [];
+        console.warn(
+            `[task-service] Using full task list for batch ${batchId} (${reason}). ` +
+                `Deploy the (batchId, startDate) composite index and run the startDate backfill to enable pagination.`
+        );
+        legacyUnsubscribe = subscribeTasksByBatch(
+            batchId,
+            (tasks) => {
+                callback({
+                    tasks,
+                    hasMore: false,
+                    totalTasks: tasks.length,
+                    startedTasks: tasks.length,
+                    legacyMode: true,
+                });
+            },
+            options.includeFutureTasks
+        );
+    };
+
+    const emit = () => {
+        if (cancelled || state.legacy) return;
+        if (!state.pinned || !state.window || !state.counts) return;
+        callback(
+            mergePagedTasks(
+                state.pinned,
+                state.window,
+                state.windowFetched,
+                options.pageSize,
+                options.includeFutureTasks,
+                state.counts
+            )
+        );
+    };
+
+    (async () => {
+        const cutoff = Timestamp.fromMillis(Date.now() + TASKS_START_CUTOFF_MARGIN_MS);
+        const counts = await fetchTaskCounts(batchId);
+        if (cancelled) return;
+        if (!counts) {
+            startLegacy("count queries failed");
+            return;
+        }
+        if (counts.total > counts.started + counts.future) {
+            startLegacy(
+                `${counts.total - counts.started - counts.future} task(s) missing startDate`
+            );
+            return;
+        }
+        state.counts = { total: counts.total, started: counts.started };
+
+        unsubs.push(
+            onSnapshot(
+                query(
+                    collection(db, "tasks"),
+                    where("batchId", "==", batchId),
+                    where("isPinned", "==", true)
+                ),
+                (snap) => {
+                    state.pinned = snap.docs.map(taskFromSnapshotDoc);
+                    emit();
+                },
+                (error) => {
+                    console.error("[task-service] Pinned tasks query failed:", error);
+                    startLegacy("pinned tasks query failed");
+                }
+            )
+        );
+
+        unsubs.push(
+            onSnapshot(
+                pagedWindowQuery(batchId, options.pageSize, options.includeFutureTasks, cutoff),
+                (snap) => {
+                    state.window = snap.docs.map(taskFromSnapshotDoc);
+                    state.windowFetched = snap.size;
+                    emit();
+                },
+                (error) => {
+                    console.error("[task-service] Paged tasks query failed:", error);
+                    startLegacy("paged tasks query failed");
+                }
+            )
+        );
+    })();
+
+    return () => {
+        cancelled = true;
+        unsubs.forEach((u) => u());
+        if (legacyUnsubscribe) legacyUnsubscribe();
+    };
+}
+
+/**
+ * One-shot version of subscribeTasksByBatchPaged for manual refreshes.
+ */
+export async function getTasksByBatchPaged(
+    batchId: string,
+    options: { pageSize: number; includeFutureTasks: boolean }
+): Promise<PagedTasksSnapshot> {
+    try {
+        const cutoff = Timestamp.fromMillis(Date.now() + TASKS_START_CUTOFF_MARGIN_MS);
+        const counts = await fetchTaskCounts(batchId);
+        if (!counts || counts.total > counts.started + counts.future) {
+            const tasks = await getTasksByBatch(batchId, options.includeFutureTasks);
+            return {
+                tasks,
+                hasMore: false,
+                totalTasks: tasks.length,
+                startedTasks: tasks.length,
+                legacyMode: true,
+            };
+        }
+
+        const [pinnedSnap, windowSnap] = await Promise.all([
+            getDocs(
+                query(
+                    collection(db, "tasks"),
+                    where("batchId", "==", batchId),
+                    where("isPinned", "==", true)
+                )
+            ),
+            getDocs(
+                pagedWindowQuery(batchId, options.pageSize, options.includeFutureTasks, cutoff)
+            ),
+        ]);
+
+        return mergePagedTasks(
+            pinnedSnap.docs.map(taskFromSnapshotDoc),
+            windowSnap.docs.map(taskFromSnapshotDoc),
+            windowSnap.size,
+            options.pageSize,
+            options.includeFutureTasks,
+            { total: counts.total, started: counts.started }
+        );
+    } catch (error) {
+        console.error("[task-service] Paged task fetch failed, falling back:", error);
+        const tasks = await getTasksByBatch(batchId, options.includeFutureTasks);
+        return {
+            tasks,
+            hasMore: false,
+            totalTasks: tasks.length,
+            startedTasks: tasks.length,
+            legacyMode: true,
+        };
+    }
+}
+
+/**
+ * Fetches tasks by explicit ids (used to resolve bookmarked tasks that are
+ * outside the currently loaded window). Ids are queried in chunks of 30,
+ * the Firestore `in` limit.
+ */
+export async function getTasksByIds(ids: string[]): Promise<Task[]> {
+    if (ids.length === 0) return [];
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < ids.length; i += 30) {
+            chunks.push(ids.slice(i, i + 30));
+        }
+        const snaps = await Promise.all(
+            chunks.map((chunk) =>
+                getDocs(query(collection(db, "tasks"), where(documentId(), "in", chunk)))
+            )
+        );
+        const tasks = snaps.flatMap((snap) => snap.docs.map(taskFromSnapshotDoc));
+        tasks.sort((a, b) => {
+            const aDate = a.startDate || a.createdAt;
+            const bDate = b.startDate || b.createdAt;
+            return bDate.getTime() - aDate.getTime();
+        });
+        return tasks;
+    } catch (error) {
+        throw new Error(`Failed to get tasks by ids: ${error}`);
+    }
+}
 
 export async function createTask(task: Omit<Task, "id">): Promise<string> {
     try {

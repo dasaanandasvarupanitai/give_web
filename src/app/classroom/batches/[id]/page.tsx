@@ -14,6 +14,7 @@ import { LinkifiedText } from "@/components/ui/linkified-text";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useBatchTasksData } from "@/hooks/use-batch-tasks-data";
+import { getTasksByIds } from "@/lib/services/firestore";
 import {
   getSubmissionStatus,
   getTaskDisplayStatus,
@@ -23,7 +24,7 @@ import {
   isTaskDueSoon,
   isTaskOverdue,
 } from "@/lib/utils/task-status";
-import { isWithinGracePeriod } from "@/lib/utils";
+import { isTaskStarted, isWithinGracePeriod } from "@/lib/utils";
 import {
   getTaskTypeColor,
   getTaskTypeIcon,
@@ -40,7 +41,8 @@ import {
   Star,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Task } from "@/lib/models/task";
 
 export default function BatchTasksPage() {
   const params = useParams();
@@ -50,10 +52,14 @@ export default function BatchTasksPage() {
   const batchId = params.id as string;
 
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
+  // Bookmarked tasks older than the loaded window, fetched on demand so the
+  // "Show Bookmarked" filter still reaches them.
+  const [bookmarkedExtraTasks, setBookmarkedExtraTasks] = useState<Task[]>([]);
 
   const {
     batch,
     tasks,
+    pagedInfo,
     submissions,
     bookmarks,
     loading,
@@ -61,14 +67,61 @@ export default function BatchTasksPage() {
     gracePeriodCountdowns,
     submissionWindowCountdowns,
     refreshData,
+    loadMoreTasks,
     handleToggleBookmark,
   } = useBatchTasksData({ batchId, userId: user?.uid, toast });
 
   const isTaskBookmarked = (taskId: string) => bookmarks.has(taskId);
 
+  useEffect(() => {
+    if (!showBookmarkedOnly) {
+      setBookmarkedExtraTasks([]);
+      return;
+    }
+    const windowIds = new Set(tasks.map((t) => t.id));
+    const missingIds = Array.from(bookmarks.keys()).filter((id) => !windowIds.has(id));
+    if (missingIds.length === 0) {
+      setBookmarkedExtraTasks([]);
+      return;
+    }
+    let cancelled = false;
+    getTasksByIds(missingIds)
+      .then((extraTasks) => {
+        if (!cancelled) {
+          setBookmarkedExtraTasks(
+            extraTasks.filter((t) => isTaskStarted(t.startDate))
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load bookmarked tasks outside the loaded window:", err);
+        if (!cancelled) setBookmarkedExtraTasks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showBookmarkedOnly, tasks, bookmarks]);
+
+  const visibleTasks = showBookmarkedOnly ? [...tasks, ...bookmarkedExtraTasks] : tasks;
   const filteredTasks = showBookmarkedOnly
-    ? tasks.filter((task) => isTaskBookmarked(task.id))
+    ? visibleTasks
+        .filter((task) => isTaskBookmarked(task.id))
+        .sort((a, b) => {
+          if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+          const aDate = a.startDate || a.createdAt;
+          const bDate = b.startDate || b.createdAt;
+          return bDate.getTime() - aDate.getTime();
+        })
     : tasks;
+
+  // In paged mode the header shows the true started-task count, not just the
+  // loaded window size.
+  const headerTaskCount = showBookmarkedOnly
+    ? filteredTasks.length
+    : pagedInfo && !pagedInfo.legacyMode
+      ? pagedInfo.startedTasks
+      : filteredTasks.length;
+  const hasMoreTasks = (pagedInfo?.hasMore ?? false) && !showBookmarkedOnly;
 
   const getTaskStatusBadge = (displayStatus: "published" | "closed") => {
     switch (displayStatus) {
@@ -162,7 +215,7 @@ export default function BatchTasksPage() {
       <div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-2xl font-bold">
-            {showBookmarkedOnly ? "Bookmarked Assessments" : "Assessments"} ({filteredTasks.length})
+            {showBookmarkedOnly ? "Bookmarked Assessments" : "Assessments"} ({headerTaskCount})
           </h2>
           <div className="flex items-center gap-2">
             <Button
@@ -370,6 +423,14 @@ export default function BatchTasksPage() {
                   <div className="grid gap-4">
                     {otherTasks.map(renderTaskCard)}
                   </div>
+                </div>
+              )}
+
+              {hasMoreTasks && (
+                <div className="flex justify-center pt-2">
+                  <Button variant="outline" onClick={loadMoreTasks}>
+                    Load More Assessments
+                  </Button>
                 </div>
               )}
             </div>

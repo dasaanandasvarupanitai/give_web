@@ -7,10 +7,12 @@ import {
     deleteTaskBookmarkByStudentAndTask,
     getBatchById,
     getSubmissionsByStudent,
-    getTasksByBatch,
+    getTasksByBatchPaged,
     subscribeSubmissionsByStudent,
     subscribeTaskBookmarksByBatch,
-    subscribeTasksByBatch,
+    subscribeTasksByBatchPaged,
+    TASKS_PAGE_SIZE,
+    type PagedTasksSnapshot,
 } from "@/lib/services/firestore";
 import {
     getGracePeriodRemainingMinutes,
@@ -28,6 +30,8 @@ interface UseBatchTasksDataParams {
 export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataParams) {
     const [batch, setBatch] = useState<Batch | null>(null);
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [pagedInfo, setPagedInfo] = useState<Omit<PagedTasksSnapshot, "tasks"> | null>(null);
+    const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE);
     const [submissions, setSubmissions] = useState<Map<string, Submission>>(new Map());
     const [bookmarks, setBookmarks] = useState<Map<string, TaskBookmark>>(new Map());
     const [loading, setLoading] = useState(true);
@@ -35,7 +39,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
     const [gracePeriodCountdowns, setGracePeriodCountdowns] = useState<Map<string, number>>(new Map());
     const [submissionWindowCountdowns, setSubmissionWindowCountdowns] = useState<Map<string, number | null>>(new Map());
 
-    // Load batch and subscribe to data
+    // Load batch and subscribe to submissions/bookmarks
     useEffect(() => {
         if (!batchId || !userId) return;
 
@@ -52,11 +56,6 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
                 setError(err.message);
                 setLoading(false);
             });
-
-        const unsubscribeTasks = subscribeTasksByBatch(batchId, (tasksList) => {
-            setTasks(tasksList);
-            setLoading(false);
-        });
 
         const unsubscribeSubmissions = subscribeSubmissionsByStudent(userId, (submissionsList) => {
             const submissionMap = new Map<string, Submission>();
@@ -75,11 +74,35 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         });
 
         return () => {
-            unsubscribeTasks();
             unsubscribeSubmissions();
             unsubscribeBookmarks();
         };
     }, [batchId, userId]);
+
+    // Subscribe to tasks in pages: pinned tasks are always included, other
+    // tasks newest-first up to visibleLimit ("Load More" increases it).
+    useEffect(() => {
+        if (!batchId || !userId) return;
+
+        const unsubscribeTasks = subscribeTasksByBatchPaged(
+            batchId,
+            { pageSize: visibleLimit, includeFutureTasks: false },
+            (snapshot) => {
+                setTasks(snapshot.tasks);
+                setPagedInfo({
+                    hasMore: snapshot.hasMore,
+                    totalTasks: snapshot.totalTasks,
+                    startedTasks: snapshot.startedTasks,
+                    legacyMode: snapshot.legacyMode,
+                });
+                setLoading(false);
+            }
+        );
+
+        return () => {
+            unsubscribeTasks();
+        };
+    }, [batchId, userId, visibleLimit]);
 
     // Update grace period countdowns
     useEffect(() => {
@@ -128,8 +151,17 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
             }
             setBatch(batchData);
 
-            const tasksList = await getTasksByBatch(batchId);
-            setTasks(tasksList);
+            const paged = await getTasksByBatchPaged(batchId, {
+                pageSize: visibleLimit,
+                includeFutureTasks: false,
+            });
+            setTasks(paged.tasks);
+            setPagedInfo({
+                hasMore: paged.hasMore,
+                totalTasks: paged.totalTasks,
+                startedTasks: paged.startedTasks,
+                legacyMode: paged.legacyMode,
+            });
 
             const submissionsList = await getSubmissionsByStudent(userId);
             const submissionMap = new Map<string, Submission>();
@@ -142,7 +174,11 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         } finally {
             setLoading(false);
         }
-    }, [batchId, userId]);
+    }, [batchId, userId, visibleLimit]);
+
+    const loadMoreTasks = useCallback(() => {
+        setVisibleLimit((current) => current + TASKS_PAGE_SIZE);
+    }, []);
 
     const handleToggleBookmark = async (task: Task, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -181,6 +217,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
     return {
         batch,
         tasks,
+        pagedInfo,
         submissions,
         bookmarks,
         loading,
@@ -188,6 +225,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         gracePeriodCountdowns,
         submissionWindowCountdowns,
         refreshData,
+        loadMoreTasks,
         handleToggleBookmark,
     };
 }

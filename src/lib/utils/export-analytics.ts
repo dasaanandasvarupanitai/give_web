@@ -66,13 +66,14 @@ export const exportAnalyticsToExcel = async (
 
     // Add data rows - uses filtered analytics based on date range
     analytics.forEach((item) => {
-        worksheet.addRow({
+        const row = worksheet.addRow({
             studentName: item.enrollment.studentName || item.student.name || "Unknown",
             dikshaName: item.enrollment.dikshaName || "",
             whatsappNumber: item.enrollment.whatsappNumber || "",
             studentEmail: item.student.email || "No email",
             totalTasks: item.totalDailyListeningTasks,
             submittedCount: item.submittedCount,
+            // Exact, unrounded value; numFmt below only affects display
             percentage: item.percentage,
             status:
                 item.percentage === 100
@@ -83,6 +84,7 @@ export const exportAnalyticsToExcel = async (
                             ? "Average"
                             : "Needs Improvement",
         });
+        row.getCell("percentage").numFmt = "0.00";
     });
 
     // Generate filename with batch name, date range, and export date

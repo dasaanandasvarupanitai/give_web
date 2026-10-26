@@ -130,9 +130,11 @@ export function useDailyListeningAnalytics(
                         );
                         const submittedCount = uniqueTaskIds.size;
                         const totalDailyListeningTasks = dailyListeningTasks.length;
+                        // Exact value, intentionally not rounded — the display
+                        // layer formats it (see formatPercentage).
                         const percentage =
                             totalDailyListeningTasks > 0
-                                ? Math.round((submittedCount / totalDailyListeningTasks) * 100)
+                                ? (submittedCount / totalDailyListeningTasks) * 100
                                 : 0;
 
                         return {

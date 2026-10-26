@@ -23,8 +23,10 @@ import {
   getBatchById,
   subscribeEnrollmentsByBatch,
   subscribeSubmissionsByTask,
-  subscribeTasksByBatch,
-  updateEnrollment
+  subscribeTasksByBatchPaged,
+  updateEnrollment,
+  TASKS_PAGE_SIZE,
+  type PagedTasksSnapshot
 } from "@/lib/services/firestore";
 import {
   ArrowLeft,
@@ -46,6 +48,8 @@ export default function BatchDetailsPage() {
   const [batch, setBatch] = useState<Batch | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [pagedInfo, setPagedInfo] = useState<Omit<PagedTasksSnapshot, "tasks"> | null>(null);
+  const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE);
   const [submissionCounts, setSubmissionCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -62,34 +66,58 @@ export default function BatchDetailsPage() {
       }
     );
 
-    let submissionUnsubscribers: (() => void)[] = [];
-
-    const unsubscribeTasks = subscribeTasksByBatch(batchId, (tasks) => {
-      setTasks(tasks);
-
-      // Clean up previous submission subscriptions
-      submissionUnsubscribers.forEach((unsub) => unsub());
-      submissionUnsubscribers = [];
-
-      // Subscribe to submissions for each task to get real-time counts
-      tasks.forEach((task) => {
-        const unsubscribe = subscribeSubmissionsByTask(task.id, (submissions) => {
-          setSubmissionCounts((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(task.id, submissions.length);
-            return newMap;
-          });
-        });
-        submissionUnsubscribers.push(unsubscribe);
-      });
-    }, true); // Include future tasks for teachers
-
     return () => {
       unsubscribeEnrollments();
+    };
+  }, [batchId]);
+
+  useEffect(() => {
+    if (!batchId) return;
+
+    let submissionUnsubscribers: (() => void)[] = [];
+
+    // Paged subscription: pinned tasks are always loaded, other tasks
+    // newest-first up to visibleLimit. Teachers also see scheduled (future)
+    // tasks. Falls back to the full list if the optimized queries cannot run.
+    const unsubscribeTasks = subscribeTasksByBatchPaged(
+      batchId,
+      { pageSize: visibleLimit, includeFutureTasks: true },
+      (snapshot) => {
+        setTasks(snapshot.tasks);
+        setPagedInfo({
+          hasMore: snapshot.hasMore,
+          totalTasks: snapshot.totalTasks,
+          startedTasks: snapshot.startedTasks,
+          legacyMode: snapshot.legacyMode,
+        });
+
+        // Clean up previous submission subscriptions
+        submissionUnsubscribers.forEach((unsub) => unsub());
+        submissionUnsubscribers = [];
+
+        // Subscribe to submissions for each loaded task to get real-time counts
+        snapshot.tasks.forEach((task) => {
+          const unsubscribe = subscribeSubmissionsByTask(task.id, (submissions) => {
+            setSubmissionCounts((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(task.id, submissions.length);
+              return newMap;
+            });
+          });
+          submissionUnsubscribers.push(unsubscribe);
+        });
+      }
+    );
+
+    return () => {
       unsubscribeTasks();
       submissionUnsubscribers.forEach((unsub) => unsub());
     };
-  }, [batchId]);
+  }, [batchId, visibleLimit]);
+
+  const loadMoreTasks = () => {
+    setVisibleLimit((current) => current + TASKS_PAGE_SIZE);
+  };
 
   const loadBatch = async () => {
     try {
@@ -265,7 +293,7 @@ export default function BatchDetailsPage() {
               <ClipboardList className="h-4 w-4 flex-shrink-0" />
               <span className="whitespace-nowrap text-xs sm:text-sm">Tasks</span>
             </div>
-            <span className="text-xs leading-tight">({tasks.length})</span>
+            <span className="text-xs leading-tight">({pagedInfo && !pagedInfo.legacyMode ? pagedInfo.totalTasks : tasks.length})</span>
           </TabsTrigger>
         </TabsList>
 
@@ -379,6 +407,13 @@ export default function BatchDetailsPage() {
                       submissionCount={submissionCounts.get(task.id) ?? task.submissionCount}
                     />
                   ))}
+                </div>
+              )}
+              {pagedInfo?.hasMore && (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" onClick={loadMoreTasks}>
+                    Load More Tasks
+                  </Button>
                 </div>
               )}
             </CardContent>
