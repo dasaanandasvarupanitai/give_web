@@ -28,11 +28,15 @@ export default function BatchSubmissionsPage() {
 
   const {
     batch,
+    tasks,
     tasksWithFiles,
+    loadingTaskIds,
     studentsMap,
     enrollmentsMap,
     loading,
+    refreshing,
     refresh,
+    loadTaskSubmissions,
   } = useSubmissionsData({ batchId, isTeacher, toast });
 
   const {
@@ -51,7 +55,6 @@ export default function BatchSubmissionsPage() {
     handleDeleteSelectedClick,
     handleDeleteSelectedConfirm,
   } = useSubmissionHandlers({
-    batchId,
     tasksWithFiles,
     onSuccess: refresh,
     toast,
@@ -141,7 +144,7 @@ export default function BatchSubmissionsPage() {
         </div>
       </div>
 
-      {tasksWithFiles.length === 0 ? (
+      {tasks.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
@@ -152,6 +155,8 @@ export default function BatchSubmissionsPage() {
       ) : (
         <SubmissionsList
           tasksWithFiles={tasksWithFiles}
+          loadingTaskIds={loadingTaskIds}
+          onLoadTask={loadTaskSubmissions}
           enrollmentsMap={enrollmentsMap}
           studentsMap={studentsMap}
           selectedFiles={deleteState.selectedFiles}
@@ -168,6 +173,13 @@ export default function BatchSubmissionsPage() {
         />
       )}
 
+      {refreshing && (
+        <div className="fixed bottom-4 right-4 flex items-center gap-2 bg-background border rounded-lg px-3 py-2 shadow-md text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Refreshing...
+        </div>
+      )}
+
       {/* Preview dialog */}
       <SubmissionPreviewDialog
         open={!!previewFile}
@@ -179,7 +191,7 @@ export default function BatchSubmissionsPage() {
       <DeleteSubmissionDialog
         open={deleteState.deleteDialogOpen}
         onOpenChange={(open) =>
-          !open && handleDeleteClick("", "", "", "")
+          !open && handleDeleteClick("", "", "", "", "")
         }
         onConfirm={handleDeleteConfirm}
         isDeleting={deleteState.deleting}
@@ -190,7 +202,7 @@ export default function BatchSubmissionsPage() {
       {/* Delete Text Submission Dialog */}
       <DeleteSubmissionDialog
         open={deleteState.deleteTextDialogOpen}
-        onOpenChange={(open) => !open && handleDeleteTextClick("", "")}
+        onOpenChange={(open) => !open && handleDeleteTextClick("", "", "")}
         onConfirm={handleDeleteTextConfirm}
         isDeleting={deleteState.deletingText}
         title="Delete Text Submission"
@@ -222,7 +234,7 @@ export default function BatchSubmissionsPage() {
       {/* Delete Entire Submission Dialog */}
       <DeleteSubmissionDialog
         open={deleteState.deleteSubmissionDialogOpen}
-        onOpenChange={(open) => !open && handleDeleteSubmissionClick("", "", [])}
+        onOpenChange={(open) => !open && handleDeleteSubmissionClick("", "", "", [])}
         onConfirm={handleDeleteSubmissionConfirm}
         isDeleting={deleteState.deletingSubmission}
         title="Delete Entire Submission"

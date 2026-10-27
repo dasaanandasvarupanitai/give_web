@@ -1,40 +1,28 @@
 import { TaskFiles } from "@/components/teacher/submissions/submissions-list";
-import { Batch } from "@/lib/models/batch";
 import { Enrollment } from "@/lib/models/enrollment";
+import { Task } from "@/lib/models/task";
 import { User } from "@/lib/models/user";
-import {
-    getBatchById,
-    getEnrollmentsByBatch,
-    getSubmissionsByBatch,
-    getTasksByBatch,
-    getUserById,
-} from "@/lib/services/firestore";
+import { Submission } from "@/lib/models/submission";
 import { getFileNameFromUrl } from "@/lib/utils/file-helpers";
 
-export async function fetchBatchSubmissionsData(batchId: string) {
-    const [batch, tasks, submissions, enrollments] = await Promise.all([
-        getBatchById(batchId),
-        getTasksByBatch(batchId, true),
-        getSubmissionsByBatch(batchId),
-        getEnrollmentsByBatch(batchId),
-    ]);
+/**
+ * Builds one task's display structure (files, text submissions, archive
+ * flags) from that task's submission documents. Shared by the submissions
+ * page's per-task loading and its post-delete rebuilds, so both paths always
+ * produce identical output.
+ */
+export function buildTaskFiles(
+    task: Task,
+    submissions: Submission[],
+    studentsMap: Map<string, User>,
+    enrollmentsMap: Map<string, Enrollment>
+): TaskFiles | null {
+    if (task.type === "announcement") return null;
 
-    const taskFilesMap = new Map<string, TaskFiles>();
-
-    tasks.forEach((task) => {
-        if (task.type === "announcement") return;
-        taskFilesMap.set(task.id, { task, studentSubmissions: [] });
-    });
-
-    const uniqueStudentIds = new Set<string>();
+    const taskFiles: TaskFiles = { task, studentSubmissions: [] };
 
     submissions.forEach((submission) => {
-        const taskFiles = taskFilesMap.get(submission.taskId);
-        if (!taskFiles) return;
-
-        if (submission.studentId) {
-            uniqueStudentIds.add(submission.studentId);
-        }
+        if (submission.taskId !== task.id) return;
 
         let studentSubmission = taskFiles.studentSubmissions.find(
             (s) => s.studentId === submission.studentId
@@ -55,7 +43,7 @@ export async function fetchBatchSubmissionsData(batchId: string) {
         }
 
         const submissionTime = submission.submittedAt || submission.createdAt;
-        const isDailyListening = taskFiles.task.type === "dailyListening";
+        const isDailyListening = task.type === "dailyListening";
 
         if (submission.fileUrls && Array.isArray(submission.fileUrls)) {
             submission.fileUrls.forEach((fileUrl) => {
@@ -70,7 +58,7 @@ export async function fetchBatchSubmissionsData(batchId: string) {
                         type: "file",
                         ...(isDailyListening && {
                             taskId: submission.taskId,
-                            taskTitle: taskFiles.task.title,
+                            taskTitle: task.title,
                         }),
                     });
                 }
@@ -87,7 +75,7 @@ export async function fetchBatchSubmissionsData(batchId: string) {
                 submittedAt: submissionTime,
                 type: "file",
                 taskId: submission.taskId,
-                taskTitle: taskFiles.task.title,
+                taskTitle: task.title,
             });
         }
 
@@ -99,67 +87,37 @@ export async function fetchBatchSubmissionsData(batchId: string) {
                 submittedAt: submissionTime,
                 type: "text",
                 taskId: submission.taskId,
-                taskTitle: taskFiles.task.title,
+                taskTitle: task.title,
             });
         }
     });
 
-    // Remove empty submissions
-    taskFilesMap.forEach((taskFiles) => {
-        taskFiles.studentSubmissions = taskFiles.studentSubmissions.filter((s) => {
-            // Check if this student has any actual submission records for this task
-            const submission = submissions.find(
-                (rawSub) => rawSub.taskId === taskFiles.task.id && rawSub.studentId === s.studentId
-            );
-            return s.files.length > 0 || s.textSubmissions.length > 0 || submission?.isArchived;
-        });
+    // Remove empty entries (no files, no text, not archived)
+    taskFiles.studentSubmissions = taskFiles.studentSubmissions.filter((s) => {
+        const submission = submissions.find(
+            (rawSub) => rawSub.studentId === s.studentId
+        );
+        return s.files.length > 0 || s.textSubmissions.length > 0 || submission?.isArchived;
     });
-
-    // Load student info
-    const studentsMap = new Map<string, User>();
-    await Promise.all(
-        Array.from(uniqueStudentIds).map(async (studentId) => {
-            try {
-                const student = await getUserById(studentId);
-                if (student) studentsMap.set(studentId, student);
-            } catch { }
-        })
-    );
-
-    // Build enrollment map
-    const enrollmentsMap = new Map<string, Enrollment>();
-    enrollments
-        .filter((e) => e.status === "active")
-        .forEach((enrollment) => {
-            if (enrollment.studentId && !enrollmentsMap.has(enrollment.studentId)) {
-                enrollmentsMap.set(enrollment.studentId, enrollment);
-            }
-        });
 
     // Sort by student name
-    taskFilesMap.forEach((taskFiles) => {
-        taskFiles.studentSubmissions.sort((a, b) => {
-            const studentA = studentsMap.get(a.studentId);
-            const studentB = studentsMap.get(b.studentId);
-            const enrollmentA = enrollmentsMap.get(a.studentId);
-            const enrollmentB = enrollmentsMap.get(b.studentId);
-            const nameA =
-                enrollmentA?.dikshaName ||
-                enrollmentA?.studentName ||
-                studentA?.name ||
-                "Unknown";
-            const nameB =
-                enrollmentB?.dikshaName ||
-                enrollmentB?.studentName ||
-                studentB?.name ||
-                "Unknown";
-            return nameA.localeCompare(nameB);
-        });
+    taskFiles.studentSubmissions.sort((a, b) => {
+        const enrollmentA = enrollmentsMap.get(a.studentId);
+        const enrollmentB = enrollmentsMap.get(b.studentId);
+        const studentA = studentsMap.get(a.studentId);
+        const studentB = studentsMap.get(b.studentId);
+        const nameA =
+            enrollmentA?.dikshaName ||
+            enrollmentA?.studentName ||
+            studentA?.name ||
+            "Unknown";
+        const nameB =
+            enrollmentB?.dikshaName ||
+            enrollmentB?.studentName ||
+            studentB?.name ||
+            "Unknown";
+        return nameA.localeCompare(nameB);
     });
 
-    const tasksWithFiles = Array.from(taskFilesMap.values()).sort(
-        (a, b) => b.task.createdAt.getTime() - a.task.createdAt.getTime()
-    );
-
-    return { batch, tasksWithFiles, studentsMap, enrollmentsMap };
+    return taskFiles;
 }

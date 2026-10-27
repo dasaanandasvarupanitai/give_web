@@ -61,7 +61,12 @@ export async function setUserRole(
     const now = Timestamp.now();
 
     if (userSnap.exists()) {
-      // Update existing user
+      // Update existing user — skip the write when the role is already
+      // correct (this function runs on every teacher page load otherwise)
+      const existingData = userSnap.data();
+      if (existingData.role === role) {
+        return;
+      }
       await updateDoc(userRef, {
         role,
         updatedAt: now,
@@ -131,16 +136,44 @@ export async function isTeacherEmail(email: string | null | undefined): Promise<
  * Teacher status is ONLY determined by the teachers collection (single source of truth)
  * The users collection role field is only used for student role
  */
+// Role checks run in the root header on every page load; caching per browser
+// session removes 2 reads (+1 redundant write for teachers) from every
+// navigation after the first. Roles are only changed by admins, so a session
+// cache is safe; new sessions re-check.
+const ROLE_SESSION_CACHE_PREFIX = "user_role_";
+
+function getCachedUserRole(userId: string): UserRole | null {
+  try {
+    return (sessionStorage.getItem(ROLE_SESSION_CACHE_PREFIX + userId) as UserRole) || null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheUserRole(userId: string, role: UserRole): void {
+  try {
+    sessionStorage.setItem(ROLE_SESSION_CACHE_PREFIX + userId, role);
+  } catch {
+    // sessionStorage unavailable — role checks just stay uncached
+  }
+}
+
 export async function getUserRoleData(
   userId: string,
   email: string | null | undefined
 ): Promise<UserRole | null> {
+  const cachedRole = getCachedUserRole(userId);
+  if (cachedRole) {
+    return cachedRole;
+  }
+
   // ONLY check teachers collection for teacher status (single source of truth)
   if (email) {
     const isTeacher = await isTeacherEmail(email);
     if (isTeacher) {
       // Update users collection for consistency (but don't rely on it for teacher validation)
       await setUserRole(userId, email, "teacher");
+      cacheUserRole(userId, "teacher");
       return "teacher";
     }
   }
@@ -148,6 +181,7 @@ export async function getUserRoleData(
   // If not a teacher, check users collection for student role
   const role = await getUserRole(userId);
   if (role === "student") {
+    cacheUserRole(userId, "student");
     return "student";
   }
 

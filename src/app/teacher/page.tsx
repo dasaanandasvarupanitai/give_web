@@ -70,21 +70,23 @@ export default function TeacherDashboardPage() {
         onStudentsClick={() => router.push("/teacher/students")}
       />
 
-      <Tabs defaultValue="course-groups" className="w-full">
+      {/* Batches is the main view: open by default; Groups/Teachers only
+          load when their tab is actually clicked. */}
+      <Tabs defaultValue="batches" className="w-full">
         <TabsList className="grid grid-cols-3 gap-2 w-full mb-16">
-          <TabsTrigger
-            value="course-groups"
-            className="flex items-center justify-center"
-          >
-            <Folder className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span>Groups</span>
-          </TabsTrigger>
           <TabsTrigger
             value="batches"
             className="flex items-center justify-center"
           >
             <Users className="h-4 w-4 mr-2 flex-shrink-0" />
             <span>Batches</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="course-groups"
+            className="flex items-center justify-center"
+          >
+            <Folder className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span>Groups</span>
           </TabsTrigger>
           <TabsTrigger
             value="teachers"
@@ -95,12 +97,12 @@ export default function TeacherDashboardPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="course-groups" className="mt-6">
-          <CourseGroupsManagement />
-        </TabsContent>
-
         <TabsContent value="batches" className="mt-6">
           <BatchManagement />
+        </TabsContent>
+
+        <TabsContent value="course-groups" className="mt-6">
+          <CourseGroupsManagement />
         </TabsContent>
 
         <TabsContent value="teachers" className="mt-6">

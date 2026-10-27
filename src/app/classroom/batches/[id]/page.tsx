@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/card";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { LinkifiedText } from "@/components/ui/linkified-text";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useBatchTasksData } from "@/hooks/use-batch-tasks-data";
-import { getTasksByIds } from "@/lib/services/firestore";
 import {
   getSubmissionStatus,
   getTaskDisplayStatus,
@@ -24,7 +24,7 @@ import {
   isTaskDueSoon,
   isTaskOverdue,
 } from "@/lib/utils/task-status";
-import { isTaskStarted, isWithinGracePeriod } from "@/lib/utils";
+import { isWithinGracePeriod } from "@/lib/utils";
 import {
   getTaskTypeColor,
   getTaskTypeIcon,
@@ -41,8 +41,7 @@ import {
   Star,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { Task } from "@/lib/models/task";
+import { useState } from "react";
 
 export default function BatchTasksPage() {
   const params = useParams();
@@ -52,14 +51,12 @@ export default function BatchTasksPage() {
   const batchId = params.id as string;
 
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
-  // Bookmarked tasks older than the loaded window, fetched on demand so the
-  // "Show Bookmarked" filter still reaches them.
-  const [bookmarkedExtraTasks, setBookmarkedExtraTasks] = useState<Task[]>([]);
 
   const {
     batch,
     tasks,
     pagedInfo,
+    bookmarkedExtraTasks,
     submissions,
     bookmarks,
     loading,
@@ -69,42 +66,17 @@ export default function BatchTasksPage() {
     refreshData,
     loadMoreTasks,
     handleToggleBookmark,
-  } = useBatchTasksData({ batchId, userId: user?.uid, toast });
+  } = useBatchTasksData({
+    batchId,
+    userId: user?.uid,
+    showBookmarkedOnly,
+    toast,
+  });
 
   const isTaskBookmarked = (taskId: string) => bookmarks.has(taskId);
 
-  useEffect(() => {
-    if (!showBookmarkedOnly) {
-      setBookmarkedExtraTasks([]);
-      return;
-    }
-    const windowIds = new Set(tasks.map((t) => t.id));
-    const missingIds = Array.from(bookmarks.keys()).filter((id) => !windowIds.has(id));
-    if (missingIds.length === 0) {
-      setBookmarkedExtraTasks([]);
-      return;
-    }
-    let cancelled = false;
-    getTasksByIds(missingIds)
-      .then((extraTasks) => {
-        if (!cancelled) {
-          setBookmarkedExtraTasks(
-            extraTasks.filter((t) => isTaskStarted(t.startDate))
-          );
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load bookmarked tasks outside the loaded window:", err);
-        if (!cancelled) setBookmarkedExtraTasks([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showBookmarkedOnly, tasks, bookmarks]);
-
-  const visibleTasks = showBookmarkedOnly ? [...tasks, ...bookmarkedExtraTasks] : tasks;
   const filteredTasks = showBookmarkedOnly
-    ? visibleTasks
+    ? [...tasks, ...bookmarkedExtraTasks]
         .filter((task) => isTaskBookmarked(task.id))
         .sort((a, b) => {
           if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -215,7 +187,8 @@ export default function BatchTasksPage() {
       <div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-2xl font-bold">
-            {showBookmarkedOnly ? "Bookmarked Assessments" : "Assessments"} ({headerTaskCount})
+            {showBookmarkedOnly ? "Bookmarked Assessments" : "Assessments"}
+            {!loading && ` (${headerTaskCount})`}
           </h2>
           <div className="flex items-center gap-2">
             <Button
@@ -229,7 +202,32 @@ export default function BatchTasksPage() {
           </div>
         </div>
 
-        {filteredTasks.length === 0 ? (
+        {loading ? (
+          // Assessments are loading — show placeholder cards so the page
+          // never looks blank or broken.
+          <div className="space-y-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-2/3" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    <Skeleton className="h-6 w-28 rounded-full" />
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredTasks.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">

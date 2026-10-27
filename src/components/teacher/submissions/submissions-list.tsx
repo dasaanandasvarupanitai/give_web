@@ -23,6 +23,8 @@ export type { StudentFile, StudentTextSubmission, StudentSubmission, TaskFiles }
 
 interface SubmissionsListProps {
     tasksWithFiles: TaskFiles[];
+    loadingTaskIds: Set<string>;
+    onLoadTask: (taskId: string) => void;
     enrollmentsMap: Map<string, Enrollment>;
     studentsMap: Map<string, User>;
     selectedFiles: Set<string>;
@@ -31,13 +33,15 @@ interface SubmissionsListProps {
     onPreview: (fileUrl: string, fileName: string) => void;
     onPreviewText: (text: string, title?: string) => void;
     onDeleteFile: (
+        taskId: string,
         submissionId: string,
         fileUrl: string,
         fileName: string,
         studentId: string
     ) => void;
-    onDeleteText: (submissionId: string, studentId: string) => void;
+    onDeleteText: (taskId: string, submissionId: string, studentId: string) => void;
     onDeleteSubmission: (
+        taskId: string,
         submissionId: string,
         studentName: string,
         fileUrls: string[]
@@ -49,6 +53,8 @@ interface SubmissionsListProps {
 
 export function SubmissionsList({
     tasksWithFiles,
+    loadingTaskIds,
+    onLoadTask,
     enrollmentsMap,
     studentsMap,
     selectedFiles,
@@ -66,6 +72,22 @@ export function SubmissionsList({
     const params = useParams();
     const batchId = params.id as string;
     const [cleanupType, setCleanupType] = useState<TaskType | null>(null);
+    const [openTaskIds, setOpenTaskIds] = useState<string[]>([]);
+
+    const loadedTaskIds = useMemo(
+        () => new Set(tasksWithFiles.map(({ task }) => task.id)),
+        [tasksWithFiles]
+    );
+
+    // Opening a task loads its submissions (only that task is read).
+    const handleOpenTasksChange = (values: string[]) => {
+        setOpenTaskIds(values);
+        values.forEach((taskId) => {
+            if (!loadedTaskIds.has(taskId) && !loadingTaskIds.has(taskId)) {
+                onLoadTask(taskId);
+            }
+        });
+    };
 
     const groupedTasks = useMemo(() => {
         const groups: Record<string, TaskFiles[]> = {};
@@ -132,12 +154,19 @@ export function SubmissionsList({
                                 Cleanup Storage
                             </Button>
                         </div>
-                        <Accordion type="multiple" className="w-full space-y-2">
+                        <Accordion
+                            type="multiple"
+                            className="w-full space-y-2"
+                            value={openTaskIds}
+                            onValueChange={handleOpenTasksChange}
+                        >
                             {groupedTasks[type].map(({ task, studentSubmissions }) => (
                                 <TaskAccordionItem
                                     key={task.id}
                                     task={task}
                                     studentSubmissions={studentSubmissions}
+                                    loaded={loadedTaskIds.has(task.id)}
+                                    loading={loadingTaskIds.has(task.id)}
                                     enrollmentsMap={enrollmentsMap}
                                     studentsMap={studentsMap}
                                     selectedFiles={selectedFiles}

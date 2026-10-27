@@ -1,4 +1,5 @@
 import {
+  countEnrollmentsByStatus,
   getBatchesByCourseGroup,
   getCourseGroups,
   getEnrollmentsByBatch,
@@ -31,26 +32,39 @@ export function useTeacherStats(userId: string | undefined, isTeacher: boolean) 
 
     try {
       const courseGroups = await getCourseGroups(userId);
-      let totalBatches = 0;
-      let totalStudents = 0;
-      let pendingEnrollments = 0;
 
-      for (const cg of courseGroups) {
-        const batches = await getBatchesByCourseGroup(cg.id);
-        totalBatches += batches.length;
+      // Counts only need the number of active/pending enrollments per batch,
+      // so use exact aggregate count queries (1 cheap read each) instead of
+      // downloading every enrollment document. Per-batch fallback to reading
+      // the documents keeps the totals identical if a count query fails.
+      const batchesPerGroup = await Promise.all(
+        courseGroups.map((cg) => getBatchesByCourseGroup(cg.id))
+      );
+      const batches = batchesPerGroup.flat();
 
-        for (const batch of batches) {
-          const enrollments = await getEnrollmentsByBatch(batch.id);
-          totalStudents += enrollments.filter((e) => e.status === "active").length;
-          pendingEnrollments += enrollments.filter((e) => e.status === "pending").length;
-        }
-      }
+      const countResults = await Promise.all(
+        batches.map(async (batch) => {
+          const [active, pending] = await Promise.all([
+            countEnrollmentsByStatus(batch.id, "active"),
+            countEnrollmentsByStatus(batch.id, "pending"),
+          ]);
+
+          if (active === null || pending === null) {
+            const enrollments = await getEnrollmentsByBatch(batch.id);
+            return {
+              active: enrollments.filter((e) => e.status === "active").length,
+              pending: enrollments.filter((e) => e.status === "pending").length,
+            };
+          }
+          return { active, pending };
+        })
+      );
 
       setStats({
         courseGroups: courseGroups.length,
-        batches: totalBatches,
-        students: totalStudents,
-        pendingEnrollments,
+        batches: batches.length,
+        students: countResults.reduce((sum, c) => sum + c.active, 0),
+        pendingEnrollments: countResults.reduce((sum, c) => sum + c.pending, 0),
       });
     } catch (error) {
       console.error("Failed to load stats:", error);

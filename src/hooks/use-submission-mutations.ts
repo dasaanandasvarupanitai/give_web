@@ -108,7 +108,7 @@ export function useSubmissionMutations({
                 notes: submissionNotes,
             };
 
-            await createSubmission(submissionData);
+            await createSubmission(submissionData, task.type);
             onSuccess();
 
             toast({

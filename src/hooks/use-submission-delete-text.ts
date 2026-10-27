@@ -2,20 +2,21 @@ import { updateSubmission } from "@/lib/services/firestore";
 import { useState } from "react";
 
 interface UseSubmissionDeleteTextParams {
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
 export function useSubmissionDeleteText({ onSuccess, toast }: UseSubmissionDeleteTextParams) {
     const [textToDelete, setTextToDelete] = useState<{
+        taskId: string;
         submissionId: string;
         studentId: string;
     } | null>(null);
     const [deleteTextDialogOpen, setDeleteTextDialogOpen] = useState(false);
     const [deletingText, setDeletingText] = useState(false);
 
-    const handleDeleteTextClick = (submissionId: string, studentId: string) => {
-        setTextToDelete({ submissionId, studentId });
+    const handleDeleteTextClick = (taskId: string, submissionId: string, studentId: string) => {
+        setTextToDelete({ taskId, submissionId, studentId });
         setDeleteTextDialogOpen(true);
     };
 
@@ -31,7 +32,7 @@ export function useSubmissionDeleteText({ onSuccess, toast }: UseSubmissionDelet
                 description: "Text submission deleted successfully",
             });
 
-            await onSuccess();
+            await onSuccess(textToDelete.taskId);
         } catch (error) {
             console.error("Error deleting text submission:", error);
             toast({

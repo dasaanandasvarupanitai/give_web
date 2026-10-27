@@ -6,6 +6,11 @@ import {
     submissionToFirestore,
 } from "@/lib/models/submission";
 import {
+    isCountableTaskType,
+    recordSubmissionForTally,
+    removeSubmissionFromTally,
+} from "./student-stats-service";
+import {
     collection,
     deleteDoc,
     deleteField,
@@ -25,7 +30,8 @@ import {
 // ==================== Submission Operations ====================
 
 export async function createSubmission(
-    submission: Omit<Submission, "id">
+    submission: Omit<Submission, "id">,
+    taskType?: string
 ): Promise<string> {
     try {
         const submissionRef = doc(collection(db, "submissions"));
@@ -37,6 +43,32 @@ export async function createSubmission(
         // Create the submission first (students have permission for this)
         await setDoc(submissionRef, submissionData);
         console.log("Submission created successfully:", submissionRef.id);
+
+        // Register (analytics tally) update — best-effort, must never affect
+        // the submission itself. Only daily listening tasks are counted, to
+        // match the analytics report exactly.
+        if (submissionData.status === "submitted" || submissionData.status === "graded") {
+            try {
+                let effectiveType = taskType;
+                if (!effectiveType) {
+                    const taskSnap = await getDoc(doc(db, "tasks", submission.taskId));
+                    effectiveType = taskSnap.exists()
+                        ? (taskSnap.data().type as string)
+                        : undefined;
+                }
+                if (isCountableTaskType(effectiveType)) {
+                    await recordSubmissionForTally(
+                        submissionData.batchId,
+                        submissionData.studentId
+                    );
+                }
+            } catch (tallyError) {
+                console.warn(
+                    "[submission-service] Register update skipped (self-heals later):",
+                    tallyError
+                );
+            }
+        }
 
         try {
             const taskRef = doc(db, "tasks", submission.taskId);
@@ -172,6 +204,24 @@ export async function deleteSubmission(
 
         await deleteDoc(submissionRef);
 
+        // Register (analytics tally) update — best-effort, after the record
+        // itself is already gone. Needs the task's type to know whether this
+        // submission was part of the daily listening count.
+        let deletedTaskType: string | undefined;
+        try {
+            const taskSnap = await getDoc(doc(db, "tasks", submissionData.taskId));
+            if (taskSnap.exists()) deletedTaskType = taskSnap.data().type as string;
+        } catch (typeError) {
+            console.warn("[submission-service] Could not read task type for register:", typeError);
+        }
+        await removeSubmissionFromTally(
+            submissionData.batchId,
+            submissionData.taskId,
+            submissionData.studentId,
+            submissionData.status,
+            deletedTaskType
+        );
+
         try {
             const taskRef = doc(db, "tasks", submissionData.taskId);
             await updateDoc(taskRef, {
@@ -183,6 +233,18 @@ export async function deleteSubmission(
         }
     } catch (error) {
         throw new Error(`Failed to delete submission: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+export async function getSubmissionById(id: string): Promise<Submission | null> {
+    try {
+        const docSnap = await getDoc(doc(db, "submissions", id));
+        if (docSnap.exists()) {
+            return submissionFromFirestore(docSnap.id, docSnap.data() as SubmissionFirestore);
+        }
+        return null;
+    } catch (error) {
+        throw new Error(`Failed to get submission: ${error}`);
     }
 }
 
@@ -277,6 +339,36 @@ export async function getSubmissionsByBatch(
     }
 }
 
+/**
+ * Reads only the batch's submissions created inside a date window (used for
+ * date-range analytics so the full history is not re-read). Callers pad the
+ * window and apply the exact filter client-side, so the result is identical
+ * to filtering the full history. Requires the (batchId, createdAt) composite
+ * index; on failure callers fall back to the full batch read.
+ */
+export async function getSubmissionsByBatchInRange(
+    batchId: string,
+    from: Date,
+    to: Date
+): Promise<Submission[]> {
+    try {
+        const q = query(
+            collection(db, "submissions"),
+            where("batchId", "==", batchId),
+            where("createdAt", ">=", Timestamp.fromDate(from)),
+            where("createdAt", "<=", Timestamp.fromDate(to))
+        );
+        const snapshot = await getDocs(q);
+        const submissions = snapshot.docs.map((doc) =>
+            submissionFromFirestore(doc.id, doc.data() as SubmissionFirestore)
+        );
+        submissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return submissions;
+    } catch (error) {
+        throw new Error(`Failed to get submissions: ${error}`);
+    }
+}
+
 export function subscribeSubmissionsByBatch(
     batchId: string,
     callback: (submissions: Submission[]) => void
@@ -293,4 +385,103 @@ export function subscribeSubmissionsByBatch(
         submissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         callback(submissions);
     });
+}
+
+// ==================== Bounded per-student reads (dashboards) ====================
+
+/** Firestore `in` filters accept at most 30 values per query. */
+const SUBMISSION_IN_CHUNK_SIZE = 30;
+
+function chunkIds(ids: string[]): string[][] {
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += SUBMISSION_IN_CHUNK_SIZE) {
+        chunks.push(ids.slice(i, i + SUBMISSION_IN_CHUNK_SIZE));
+    }
+    return chunks;
+}
+
+function sortSubmissionsDesc(submissions: Submission[]): Submission[] {
+    return submissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+/**
+ * Live subscription to one student's submissions for an explicit list of
+ * tasks only (the dashboard's loaded window) instead of the student's entire
+ * history. Real-time behavior is identical to subscribeSubmissionsByStudent
+ * for the requested tasks. Equality-only filters need no composite index;
+ * if any chunk query fails, onError fires once so the caller can fall back.
+ */
+export function subscribeSubmissionsByStudentAndTaskIds(
+    studentId: string,
+    taskIds: string[],
+    callback: (submissions: Submission[]) => void,
+    onError?: (error: Error) => void
+): () => void {
+    if (taskIds.length === 0) {
+        callback([]);
+        return () => { };
+    }
+
+    const merged = new Map<string, Submission>();
+    let errored = false;
+
+    const unsubs = chunkIds(taskIds).map((chunk) =>
+        onSnapshot(
+            query(
+                collection(db, "submissions"),
+                where("studentId", "==", studentId),
+                where("taskId", "in", chunk)
+            ),
+            (snapshot) => {
+                for (const taskId of chunk) merged.delete(taskId);
+                for (const docSnap of snapshot.docs) {
+                    const submission = submissionFromFirestore(
+                        docSnap.id,
+                        docSnap.data() as SubmissionFirestore
+                    );
+                    merged.set(submission.taskId, submission);
+                }
+                callback(sortSubmissionsDesc(Array.from(merged.values())));
+            },
+            (error) => {
+                if (errored) return;
+                errored = true;
+                onError?.(error);
+            }
+        )
+    );
+
+    return () => unsubs.forEach((unsub) => unsub());
+}
+
+/**
+ * One-shot version of subscribeSubmissionsByStudentAndTaskIds for manual
+ * refreshes.
+ */
+export async function getSubmissionsByStudentAndTaskIds(
+    studentId: string,
+    taskIds: string[]
+): Promise<Submission[]> {
+    if (taskIds.length === 0) return [];
+    try {
+        const snapshots = await Promise.all(
+            chunkIds(taskIds).map((chunk) =>
+                getDocs(
+                    query(
+                        collection(db, "submissions"),
+                        where("studentId", "==", studentId),
+                        where("taskId", "in", chunk)
+                    )
+                )
+            )
+        );
+        const submissions = snapshots.flatMap((snapshot) =>
+            snapshot.docs.map((doc) =>
+                submissionFromFirestore(doc.id, doc.data() as SubmissionFirestore)
+            )
+        );
+        return sortSubmissionsDesc(submissions);
+    } catch (error) {
+        throw new Error(`Failed to get submissions: ${error}`);
+    }
 }

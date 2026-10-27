@@ -6,14 +6,12 @@ import { useSubmissionDeleteSelected } from "./use-submission-delete-selected";
 import { useSubmissionDeleteText } from "./use-submission-delete-text";
 
 interface UseSubmissionHandlersParams {
-    batchId: string;
     tasksWithFiles: TaskFiles[];
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
 export function useSubmissionHandlers({
-    batchId,
     tasksWithFiles,
     onSuccess,
     toast,
@@ -25,7 +23,7 @@ export function useSubmissionHandlers({
         deleting,
         handleDeleteClick,
         handleDeleteConfirm,
-    } = useSubmissionDeleteFile({ batchId, onSuccess, toast });
+    } = useSubmissionDeleteFile({ onSuccess, toast });
 
     const {
         textToDelete,
@@ -43,7 +41,7 @@ export function useSubmissionHandlers({
         deletingAll,
         handleDeleteAllClick,
         handleDeleteAllConfirm,
-    } = useSubmissionDeleteAll({ batchId, onSuccess, toast });
+    } = useSubmissionDeleteAll({ onSuccess, toast });
 
     const {
         selectedFiles,
@@ -55,7 +53,7 @@ export function useSubmissionHandlers({
         getSelectedFilesForTask,
         handleDeleteSelectedClick,
         handleDeleteSelectedConfirm,
-    } = useSubmissionDeleteSelected({ batchId, tasksWithFiles, onSuccess, toast });
+    } = useSubmissionDeleteSelected({ tasksWithFiles, onSuccess, toast });
 
     const {
         submissionToDelete,

@@ -1,15 +1,15 @@
 import { deleteFileByUrl } from "@/lib/services/storage";
-import { getSubmissionsByBatch, updateSubmission } from "@/lib/services/firestore";
+import { getSubmissionById, updateSubmission } from "@/lib/services/firestore";
 import { useState } from "react";
 
 interface UseSubmissionDeleteFileParams {
-    batchId: string;
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
-export function useSubmissionDeleteFile({ batchId, onSuccess, toast }: UseSubmissionDeleteFileParams) {
+export function useSubmissionDeleteFile({ onSuccess, toast }: UseSubmissionDeleteFileParams) {
     const [fileToDelete, setFileToDelete] = useState<{
+        taskId: string;
         submissionId: string;
         fileUrl: string;
         fileName: string;
@@ -19,12 +19,13 @@ export function useSubmissionDeleteFile({ batchId, onSuccess, toast }: UseSubmis
     const [deleting, setDeleting] = useState(false);
 
     const handleDeleteClick = (
+        taskId: string,
         submissionId: string,
         fileUrl: string,
         fileName: string,
         studentId: string
     ) => {
-        setFileToDelete({ submissionId, fileUrl, fileName, studentId });
+        setFileToDelete({ taskId, submissionId, fileUrl, fileName, studentId });
         setDeleteDialogOpen(true);
     };
 
@@ -35,8 +36,8 @@ export function useSubmissionDeleteFile({ batchId, onSuccess, toast }: UseSubmis
         try {
             const fileExisted = await deleteFileByUrl(fileToDelete.fileUrl);
 
-            const submissions = await getSubmissionsByBatch(batchId);
-            const submission = submissions.find((s) => s.id === fileToDelete.submissionId);
+            // Read only the one submission being edited, not the whole batch.
+            const submission = await getSubmissionById(fileToDelete.submissionId);
 
             if (submission) {
                 const updates: Record<string, unknown> = {};
@@ -66,7 +67,7 @@ export function useSubmissionDeleteFile({ batchId, onSuccess, toast }: UseSubmis
                     : "File reference removed (file was already deleted from storage)",
             });
 
-            await onSuccess();
+            await onSuccess(fileToDelete.taskId);
         } catch (error) {
             console.error("Error deleting file:", error);
             toast({

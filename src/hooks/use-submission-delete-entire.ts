@@ -1,14 +1,14 @@
 import { deleteSubmission } from "@/lib/services/firestore";
-import { Submission } from "@/lib/models/submission";
 import { useState } from "react";
 
 interface UseSubmissionDeleteEntireParams {
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
 export function useSubmissionDeleteEntire({ onSuccess, toast }: UseSubmissionDeleteEntireParams) {
     const [submissionToDelete, setSubmissionToDelete] = useState<{
+        taskId: string;
         submissionId: string;
         studentName: string;
         fileUrls: string[];
@@ -18,12 +18,13 @@ export function useSubmissionDeleteEntire({ onSuccess, toast }: UseSubmissionDel
     const [deletingSubmission, setDeletingSubmission] = useState(false);
 
     const handleDeleteSubmissionClick = (
+        taskId: string,
         submissionId: string,
         studentName: string,
         fileUrls: string[],
         recordingUrl?: string
     ) => {
-        setSubmissionToDelete({ submissionId, studentName, fileUrls, recordingUrl });
+        setSubmissionToDelete({ taskId, submissionId, studentName, fileUrls, recordingUrl });
         setDeleteSubmissionDialogOpen(true);
     };
 
@@ -44,7 +45,7 @@ export function useSubmissionDeleteEntire({ onSuccess, toast }: UseSubmissionDel
                 description: `Submission for ${submissionToDelete.studentName} has been completely removed. They can now resubmit.`,
             });
 
-            await onSuccess();
+            await onSuccess(submissionToDelete.taskId);
         } catch (error) {
             console.error("Error deleting entire submission:", error);
             toast({

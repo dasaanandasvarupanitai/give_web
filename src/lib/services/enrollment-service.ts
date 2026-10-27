@@ -11,6 +11,7 @@ import {
     deleteDoc,
     deleteField,
     doc,
+    getCountFromServer,
     getDoc,
     getDocs,
     increment,
@@ -24,6 +25,31 @@ import {
 } from "firebase/firestore";
 
 // ==================== Enrollment Operations ====================
+
+/**
+ * Exact count of a batch's enrollments with the given status via an
+ * aggregate query (1 cheap read) instead of downloading every enrollment
+ * document. Returns null when the count query fails so callers can fall
+ * back to reading the documents themselves.
+ */
+export async function countEnrollmentsByStatus(
+    batchId: string,
+    status: Enrollment["status"]
+): Promise<number | null> {
+    try {
+        const snapshot = await getCountFromServer(
+            query(
+                collection(db, "enrollments"),
+                where("batchId", "==", batchId),
+                where("status", "==", status)
+            )
+        );
+        return snapshot.data().count;
+    } catch (error) {
+        console.error("[enrollment-service] Enrollment count query failed:", error);
+        return null;
+    }
+}
 
 export async function createEnrollment(
     enrollment: Omit<Enrollment, "id">,

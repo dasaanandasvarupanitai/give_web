@@ -3,6 +3,16 @@
 import { AnalyticsDateFilter } from "@/components/teacher/analytics/analytics-date-filter";
 import { AnalyticsSummaryCards } from "@/components/teacher/analytics/analytics-summary-cards";
 import { AnalyticsTable } from "@/components/teacher/analytics/analytics-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +22,7 @@ import { useDailyListeningAnalytics } from "@/hooks/use-daily-listening-analytic
 import { useTeacher } from "@/hooks/use-teacher";
 import { useToast } from "@/hooks/use-toast";
 import { exportAnalyticsToExcel } from "@/lib/utils/export-analytics";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, Loader2, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -40,13 +50,11 @@ export default function DailyListeningAnalyticsPage() {
   });
   const [dateRangePreset, setDateRangePreset] = useState<string>("all");
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [recountDialogOpen, setRecountDialogOpen] = useState(false);
 
   // Use custom hook for data fetching
-  const { batch, analytics, loading, error } = useDailyListeningAnalytics(
-    batchId,
-    isTeacher,
-    appliedDateRange
-  );
+  const { batch, analytics, autoCorrections, recounting, loading, error, recountAll } =
+    useDailyListeningAnalytics(batchId, isTeacher, appliedDateRange);
 
   useEffect(() => {
     // Redirect if not a teacher
@@ -93,6 +101,19 @@ export default function DailyListeningAnalyticsPage() {
     }
   };
 
+  const handleRecountConfirm = async () => {
+    setRecountDialogOpen(false);
+    try {
+      await recountAll();
+      toast({
+        title: "Recount complete",
+        description: "All totals were re-checked from the original submissions.",
+      });
+    } catch {
+      // error state is surfaced through the existing error toast effect
+    }
+  };
+
   if (teacherInitializing || loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -124,9 +145,7 @@ export default function DailyListeningAnalyticsPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Batch not found</h1>
-          <Button onClick={() => router.push("/teacher")}>
-            Back to Dashboard
-          </Button>
+          <Button onClick={() => router.push("/teacher")}>Back to Dashboard</Button>
         </div>
       </div>
     );
@@ -156,15 +175,37 @@ export default function DailyListeningAnalyticsPage() {
                 View submission statistics for daily listening tasks
               </p>
             </div>
-            <Button
-              onClick={handleExportToExcel}
-              disabled={analytics.length === 0}
-              className="w-full sm:w-auto"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export to Excel
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => setRecountDialogOpen(true)}
+                disabled={recounting}
+                className="w-full sm:w-auto"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${recounting ? "animate-spin" : ""}`} />
+                {recounting ? "Recounting..." : "Recount"}
+              </Button>
+              <Button
+                onClick={handleExportToExcel}
+                disabled={analytics.length === 0}
+                className="w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to Excel
+              </Button>
+            </div>
           </div>
+
+          {autoCorrections > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>
+                {autoCorrections} student total{autoCorrections !== 1 ? "s" : ""}{" "}
+                automatically re-checked and corrected just now. Numbers shown are
+                verified against the original submissions.
+              </span>
+            </div>
+          )}
 
           <AnalyticsDateFilter
             dateRange={dateRange}
@@ -198,6 +239,25 @@ export default function DailyListeningAnalyticsPage() {
           <AnalyticsTable analytics={analytics} />
         </>
       )}
+
+      <AlertDialog open={recountDialogOpen} onOpenChange={setRecountDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recount all totals?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This re-checks every submission from the very beginning. It will
+              cost heavy reads on your Firebase, so only do this if a number
+              ever looks wrong. Normal reports do not need it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRecountConfirm}>
+              Yes, recount everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

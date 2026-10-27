@@ -17,7 +17,7 @@ import {
     getTaskTypeIcon,
     getTaskTypeLabel,
 } from "@/lib/utils/task-helpers";
-import { Trash2, Download } from "lucide-react";
+import { Trash2, Download, Loader2 } from "lucide-react";
 import { StudentAccordionItem } from "./student-accordion-item";
 import type { StudentFile, StudentSubmission, TaskFiles } from "./types";
 import { downloadSlokaSubmissionsAsExcel } from "@/lib/utils/export-students";
@@ -25,6 +25,8 @@ import { downloadSlokaSubmissionsAsExcel } from "@/lib/utils/export-students";
 interface TaskAccordionItemProps {
     task: Task;
     studentSubmissions: StudentSubmission[];
+    loaded: boolean;
+    loading: boolean;
     enrollmentsMap: Map<string, Enrollment>;
     studentsMap: Map<string, User>;
     selectedFiles: Set<string>;
@@ -33,13 +35,15 @@ interface TaskAccordionItemProps {
     onPreview: (fileUrl: string, fileName: string) => void;
     onPreviewText: (text: string, title?: string) => void;
     onDeleteFile: (
+        taskId: string,
         submissionId: string,
         fileUrl: string,
         fileName: string,
         studentId: string
     ) => void;
-    onDeleteText: (submissionId: string, studentId: string) => void;
+    onDeleteText: (taskId: string, submissionId: string, studentId: string) => void;
     onDeleteSubmission: (
+        taskId: string,
         submissionId: string,
         studentName: string,
         fileUrls: string[]
@@ -51,6 +55,8 @@ interface TaskAccordionItemProps {
 export function TaskAccordionItem({
     task,
     studentSubmissions,
+    loaded,
+    loading,
     enrollmentsMap,
     studentsMap,
     selectedFiles,
@@ -110,16 +116,27 @@ export function TaskAccordionItem({
                         </div>
                         <div className="text-sm text-muted-foreground">
                             {getTaskTypeLabel(task.type)} • {enrollmentsMap.size} student
-                            {enrollmentsMap.size !== 1 ? "s" : ""} • {totalSubmissions}{" "}
-                            submission
-                            {totalSubmissions !== 1 ? "s" : ""}
-                            {isDailyListening && totalTextSubmissions > 0 && (
-                                <span>
-                                    {" "}
-                                    ({totalTextSubmissions} text
-                                    {totalTextSubmissions !== 1 ? "s" : ""}, {totalFiles} file
-                                    {totalFiles !== 1 ? "s" : ""})
+                            {enrollmentsMap.size !== 1 ? "s" : ""} •{" "}
+                            {loading ? (
+                                <span className="inline-flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                                    loading...
                                 </span>
+                            ) : loaded ? (
+                                <>
+                                    {totalSubmissions} submission
+                                    {totalSubmissions !== 1 ? "s" : ""}
+                                    {isDailyListening && totalTextSubmissions > 0 && (
+                                        <span>
+                                            {" "}
+                                            ({totalTextSubmissions} text
+                                            {totalTextSubmissions !== 1 ? "s" : ""}, {totalFiles} file
+                                            {totalFiles !== 1 ? "s" : ""})
+                                        </span>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="italic">open to load submissions</span>
                             )}
                             <Badge
                                 variant="outline"
@@ -138,6 +155,19 @@ export function TaskAccordionItem({
                 </div>
             </AccordionTrigger>
             <AccordionContent className="pt-4 pb-6">
+                {!loaded ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                        {loading ? (
+                            <span className="inline-flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading submissions...
+                            </span>
+                        ) : (
+                            <p>Open this task to load its submissions.</p>
+                        )}
+                    </div>
+                ) : (
+                <>
                 {task.type === "slokaMemorization" && (
                     <div className="flex justify-end mb-4">
                         <Button
@@ -221,15 +251,23 @@ export function TaskAccordionItem({
                                         onSelectFile={onSelectFile}
                                         onPreview={onPreview}
                                         onPreviewText={onPreviewText}
-                                        onDeleteFile={onDeleteFile}
-                                        onDeleteText={onDeleteText}
-                                        onDeleteSubmission={onDeleteSubmission}
+                                        onDeleteFile={(submissionId, fileUrl, fileName, studentId) =>
+                                            onDeleteFile(task.id, submissionId, fileUrl, fileName, studentId)
+                                        }
+                                        onDeleteText={(submissionId, studentId) =>
+                                            onDeleteText(task.id, submissionId, studentId)
+                                        }
+                                        onDeleteSubmission={(submissionId, studentName, fileUrls) =>
+                                            onDeleteSubmission(task.id, submissionId, studentName, fileUrls)
+                                        }
                                         onDownload={handleDownload}
                                     />
                                 );
                             })}
                         </Accordion>
                     </div>
+                )}
+                </>
                 )}
             </AccordionContent>
         </AccordionItem>

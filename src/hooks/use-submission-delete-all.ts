@@ -1,15 +1,14 @@
 import { Task } from "@/lib/models/task";
 import { deleteFileByUrl } from "@/lib/services/storage";
-import { getSubmissionsByBatch, updateSubmission } from "@/lib/services/firestore";
+import { getSubmissionsByTask, updateSubmission } from "@/lib/services/firestore";
 import { useState } from "react";
 
 interface UseSubmissionDeleteAllParams {
-    batchId: string;
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
-export function useSubmissionDeleteAll({ batchId, onSuccess, toast }: UseSubmissionDeleteAllParams) {
+export function useSubmissionDeleteAll({ onSuccess, toast }: UseSubmissionDeleteAllParams) {
     const [taskToDeleteAll, setTaskToDeleteAll] = useState<Task | null>(null);
     const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
     const [deletingAll, setDeletingAll] = useState(false);
@@ -24,8 +23,8 @@ export function useSubmissionDeleteAll({ batchId, onSuccess, toast }: UseSubmiss
 
         setDeletingAll(true);
         try {
-            const submissions = await getSubmissionsByBatch(batchId);
-            const taskSubmissions = submissions.filter((s) => s.taskId === taskToDeleteAll.id);
+            // Only this task's submissions are needed — never the whole batch.
+            const taskSubmissions = await getSubmissionsByTask(taskToDeleteAll.id);
 
             const deletePromises: Promise<void>[] = [];
 
@@ -65,7 +64,7 @@ export function useSubmissionDeleteAll({ batchId, onSuccess, toast }: UseSubmiss
                 description: `All submissions for "${taskToDeleteAll.title}" deleted`,
             });
 
-            await onSuccess();
+            await onSuccess(taskToDeleteAll.id);
         } catch (error) {
             console.error("Error deleting all files:", error);
             toast({

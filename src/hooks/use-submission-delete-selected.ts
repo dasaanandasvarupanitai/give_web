@@ -1,17 +1,15 @@
 import { StudentFile, TaskFiles } from "@/components/teacher/submissions/submissions-list";
 import { deleteFileByUrl } from "@/lib/services/storage";
-import { getSubmissionsByBatch, updateSubmission } from "@/lib/services/firestore";
+import { getSubmissionById, updateSubmission } from "@/lib/services/firestore";
 import { useState } from "react";
 
 interface UseSubmissionDeleteSelectedParams {
-    batchId: string;
     tasksWithFiles: TaskFiles[];
-    onSuccess: () => Promise<void>;
+    onSuccess: (taskId?: string) => Promise<void>;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
 export function useSubmissionDeleteSelected({
-    batchId,
     tasksWithFiles,
     onSuccess,
     toast,
@@ -71,7 +69,6 @@ export function useSubmissionDeleteSelected({
 
         setDeletingSelected(true);
         try {
-            const submissions = await getSubmissionsByBatch(batchId);
             const filesBySubmission = new Map<string, { fileUrl: string; fileName: string }[]>();
 
             tasksWithFiles.forEach(({ studentSubmissions }) => {
@@ -89,7 +86,8 @@ export function useSubmissionDeleteSelected({
             const deletePromises: Promise<void>[] = [];
 
             for (const [submissionId, files] of filesBySubmission.entries()) {
-                const submission = submissions.find((s) => s.id === submissionId);
+                // Read only the submissions being edited, not the whole batch.
+                const submission = await getSubmissionById(submissionId);
                 if (!submission) continue;
 
                 for (const file of files) {

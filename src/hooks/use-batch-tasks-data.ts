@@ -7,8 +7,11 @@ import {
     deleteTaskBookmarkByStudentAndTask,
     getBatchById,
     getSubmissionsByStudent,
+    getSubmissionsByStudentAndTaskIds,
+    getTasksByIds,
     getTasksByBatchPaged,
     subscribeSubmissionsByStudent,
+    subscribeSubmissionsByStudentAndTaskIds,
     subscribeTaskBookmarksByBatch,
     subscribeTasksByBatchPaged,
     TASKS_PAGE_SIZE,
@@ -17,21 +20,29 @@ import {
 import {
     getGracePeriodRemainingMinutes,
     getSubmissionWindowRemainingMinutes,
+    isTaskStarted,
     isWithinGracePeriod,
 } from "@/lib/utils";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface UseBatchTasksDataParams {
     batchId: string;
     userId: string | undefined;
+    showBookmarkedOnly: boolean;
     toast: (params: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
-export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataParams) {
+export function useBatchTasksData({ batchId, userId, showBookmarkedOnly, toast }: UseBatchTasksDataParams) {
     const [batch, setBatch] = useState<Batch | null>(null);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [pagedInfo, setPagedInfo] = useState<Omit<PagedTasksSnapshot, "tasks"> | null>(null);
     const [visibleLimit, setVisibleLimit] = useState(TASKS_PAGE_SIZE);
+    // Bookmarked tasks outside the loaded window, fetched on demand so the
+    // "Show Bookmarked" filter still reaches them.
+    const [bookmarkedExtraTasks, setBookmarkedExtraTasks] = useState<Task[]>([]);
+    // Falls back to the full-history submissions subscription if the bounded
+    // query ever fails (e.g. a missing index) — same behavior, more reads.
+    const [submissionsLegacy, setSubmissionsLegacy] = useState(false);
     const [submissions, setSubmissions] = useState<Map<string, Submission>>(new Map());
     const [bookmarks, setBookmarks] = useState<Map<string, TaskBookmark>>(new Map());
     const [loading, setLoading] = useState(true);
@@ -39,7 +50,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
     const [gracePeriodCountdowns, setGracePeriodCountdowns] = useState<Map<string, number>>(new Map());
     const [submissionWindowCountdowns, setSubmissionWindowCountdowns] = useState<Map<string, number | null>>(new Map());
 
-    // Load batch and subscribe to submissions/bookmarks
+    // Load batch and subscribe to bookmarks
     useEffect(() => {
         if (!batchId || !userId) return;
 
@@ -57,14 +68,6 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
                 setLoading(false);
             });
 
-        const unsubscribeSubmissions = subscribeSubmissionsByStudent(userId, (submissionsList) => {
-            const submissionMap = new Map<string, Submission>();
-            for (const submission of submissionsList) {
-                submissionMap.set(submission.taskId, submission);
-            }
-            setSubmissions(submissionMap);
-        });
-
         const unsubscribeBookmarks = subscribeTaskBookmarksByBatch(batchId, userId, (bookmarksList) => {
             const bookmarkMap = new Map<string, TaskBookmark>();
             for (const bookmark of bookmarksList) {
@@ -74,7 +77,6 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         });
 
         return () => {
-            unsubscribeSubmissions();
             unsubscribeBookmarks();
         };
     }, [batchId, userId]);
@@ -103,6 +105,89 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
             unsubscribeTasks();
         };
     }, [batchId, userId, visibleLimit]);
+
+    // Fetch bookmarked tasks that are older than the loaded window when the
+    // "Show Bookmarked" filter is active.
+    useEffect(() => {
+        if (!showBookmarkedOnly) {
+            setBookmarkedExtraTasks([]);
+            return;
+        }
+        const windowIds = new Set(tasks.map((t) => t.id));
+        const missingIds = Array.from(bookmarks.keys()).filter((id) => !windowIds.has(id));
+        if (missingIds.length === 0) {
+            setBookmarkedExtraTasks([]);
+            return;
+        }
+        let cancelled = false;
+        getTasksByIds(missingIds)
+            .then((extraTasks) => {
+                if (!cancelled) {
+                    setBookmarkedExtraTasks(
+                        extraTasks.filter((t) => isTaskStarted(t.startDate))
+                    );
+                }
+            })
+            .catch((err) => {
+                console.error("Failed to load bookmarked tasks outside the loaded window:", err);
+                if (!cancelled) setBookmarkedExtraTasks([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [showBookmarkedOnly, tasks, bookmarks]);
+
+    // Submissions scoped to the tasks currently visible on the dashboard
+    // (loaded window + pinned + bookmarked extras) instead of the student's
+    // entire history. Same real-time behavior for everything rendered.
+    const visibleTaskIds = useMemo(() => {
+        const ids = new Set(tasks.map((t) => t.id));
+        if (showBookmarkedOnly) {
+            for (const t of bookmarkedExtraTasks) ids.add(t.id);
+        }
+        return Array.from(ids);
+    }, [tasks, showBookmarkedOnly, bookmarkedExtraTasks]);
+    const visibleTaskIdsKey = visibleTaskIds.join(",");
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const apply = (submissionsList: Submission[]) => {
+            const submissionMap = new Map<string, Submission>();
+            for (const submission of submissionsList) {
+                submissionMap.set(submission.taskId, submission);
+            }
+            setSubmissions(submissionMap);
+        };
+
+        if (submissionsLegacy) {
+            const unsubscribe = subscribeSubmissionsByStudent(userId, apply);
+            return () => {
+                unsubscribe();
+            };
+        }
+
+        // Before the task list arrives there is nothing to scope the query to;
+        // wait instead of falling back to the full-history subscription.
+        if (visibleTaskIds.length === 0) return;
+
+        const unsubscribe = subscribeSubmissionsByStudentAndTaskIds(
+            userId,
+            visibleTaskIds,
+            apply,
+            (error) => {
+                console.error(
+                    "[use-batch-tasks-data] Bounded submissions query failed, falling back to full history:",
+                    error
+                );
+                setSubmissionsLegacy(true);
+            }
+        );
+        return () => {
+            unsubscribe();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId, visibleTaskIdsKey, submissionsLegacy]);
 
     // Update grace period countdowns
     useEffect(() => {
@@ -163,7 +248,9 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
                 legacyMode: paged.legacyMode,
             });
 
-            const submissionsList = await getSubmissionsByStudent(userId);
+            const submissionsList = submissionsLegacy
+                ? await getSubmissionsByStudent(userId)
+                : await getSubmissionsByStudentAndTaskIds(userId, visibleTaskIds);
             const submissionMap = new Map<string, Submission>();
             for (const submission of submissionsList) {
                 submissionMap.set(submission.taskId, submission);
@@ -174,7 +261,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         } finally {
             setLoading(false);
         }
-    }, [batchId, userId, visibleLimit]);
+    }, [batchId, userId, visibleLimit, visibleTaskIdsKey, submissionsLegacy]);
 
     const loadMoreTasks = useCallback(() => {
         setVisibleLimit((current) => current + TASKS_PAGE_SIZE);
@@ -218,6 +305,7 @@ export function useBatchTasksData({ batchId, userId, toast }: UseBatchTasksDataP
         batch,
         tasks,
         pagedInfo,
+        bookmarkedExtraTasks,
         submissions,
         bookmarks,
         loading,
